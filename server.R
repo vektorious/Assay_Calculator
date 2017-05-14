@@ -240,18 +240,20 @@ shinyServer(function(input, output) {
       se = num_all_means[,2]
     )
     
-    if (input$assay_type == 2){
+    if (input$bar_columns == 2){
       bpmax <- ggplot(max_barplot, aes(fill=eli, y=maxima, x=eli)) + facet_wrap(~gen, ncol = 2) + ggtitle("Maxima with SD")
-    }
-    
-    else {
+    } else {
       bpmax <- ggplot(max_barplot, aes(fill=eli, y=maxima, x=eli)) + facet_wrap(~gen, ncol = 1) + ggtitle("Maxima with SD")
-    }
+      }
+    
+    if(input$bar_rotation == 2){bpmax <- bpmax + coord_flip() + theme(legend.position = "none")}
     
     bpmax <- bpmax + geom_bar(position="dodge", stat="identity")
     bpmax <- bpmax + geom_errorbar(aes(ymin=maxima-se, ymax=maxima+se),
                                    width=.2,                    # Width of the error bars
                                    position=position_dodge(.9))
+    
+    
     bpmax <- bpmax + labs(x="", y="L/Lmax") + theme(axis.text.x = element_text(angle = 90, size = 10, vjust = 0.5),
                                                     legend.title=element_blank(),
                                                     panel.background = element_rect(fill = "white", colour = "grey90"),
@@ -366,10 +368,14 @@ shinyServer(function(input, output) {
       #ggsave(file, width = 29.7, height = 21.0, units = "cm", limitsize = FALSE)
       wellcurves <- well_plots()
       platelayout <- plate_layout()
+      bar_plots <- bar_plots_max()
+      graph_mean <- mean_graphs()
       
       pdf(file, width = 29.7, height = 21.0, paper = "a4r")
       invisible(print(wellcurves))
       if (is.null(platelayout) == FALSE){invisible(print(platelayout))}
+      if (is.null(bar_plots) == FALSE){invisible(print(bar_plots))}
+      if (is.null(graph_mean) == FALSE){invisible(print(graph_mean))}
       dev.off()
       
     }
@@ -393,17 +399,17 @@ shinyServer(function(input, output) {
   })
   
   
-  output$norm_data <- renderMenu({
+  output$menu <- renderMenu({
     
     inputlayout <- input$layout_file
     
-    if (is.null(inputlayout))
-      return(NULL)
-    
     sidebarMenu(
-      menuItem("Data Summary", tabName = "data_summary", icon = icon("bar-chart"),
-               menuSubItem("Mean Maxima", tabName = "norm_data1"),
-               menuSubItem("Mean Kinetics", tabName = "norm_data2"))
+      menuItem("Raw Data", tabName = "rawdata", icon = icon("calculator"), selected = TRUE),
+      if (is.null(inputlayout)==FALSE){
+        menuItem("Data Summary", tabName = "data_summary", icon = icon("bar-chart"),
+                menuSubItem("Mean Maxima", tabName = "norm_data1"),
+                menuSubItem("Mean Kinetics", tabName = "norm_data2"))
+      }
     )
   })
 })

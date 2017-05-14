@@ -10,10 +10,7 @@ dashboardPage(
   ),
   
   dashboardSidebar(
-    sidebarMenu(
-      menuItem("Raw Data", tabName = "rawdata", icon = icon("calculator"))
-    ),
-    sidebarMenuOutput("norm_data"),
+    sidebarMenuOutput("menu"),
     
     fileInput("data_file", label = h4("Data file input"), accept = c(".xls", ".xlsx")),
     fileInput("layout_file", label = h4("Layout file input (optional)"), accept = c(".xls", ".xlsx"))
@@ -53,7 +50,15 @@ dashboardPage(
               width = 9,
               collapsible = TRUE,
               plotOutput("bar_max", height = 600)
-              )
+              ),
+          box(title = "Plot Settings",
+              radioButtons(inputId="bar_rotation", label=h4("Bar Rotation"), 
+                           choices = list("vertical bars" = 1, "horizontal bars" = 2),
+                           selected = 1),
+              radioButtons(inputId="bar_columns", label=h4("Plot Arrangement"), 
+                           choices = list("vertical alignment" = 1, "horizontal alignment" = 2),
+                           selected = 1)
+          )
           )
         ),
       tabItem(tabName = "norm_data2",
@@ -62,7 +67,8 @@ dashboardPage(
                 width = 9,
                 collapsible = TRUE,
                 plotOutput("graph_mean", height = 600)
-                )
+                ),
+            box(title = "Plot Settings")
           )
         )
       )

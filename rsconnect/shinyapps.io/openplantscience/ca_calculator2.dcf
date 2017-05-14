@@ -3,8 +3,8 @@ title: Assay_Calculator
 account: openplantscience
 server: shinyapps.io
 appId: 180074
-bundleId: 826966
+bundleId: 827444
 url: https://openplantscience.shinyapps.io/ca_calculator2/
-when: 1494716842.11988
+when: 1494795403.13345
 asMultiple: FALSE
 asStatic: FALSE
