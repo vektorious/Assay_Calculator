@@ -173,13 +173,9 @@ shinyServer(function(input, output) {
     
     if (input$data_type == 1){
       chosen_set <- data$ms_rd_melted
-    }
-    
-    if (input$assay_type == 2){
+    } else if (input$assay_type == 2){
       chosen_set <- data$ms_rd_melted
-    }
-    
-    else {
+    }else {
       chosen_set <- data$ms_nd_melted
     }
     
