@@ -51,11 +51,22 @@ shinyServer(function(input, output) {
     ms_rd_melted <- melt(ms_rawdata, id.vars = "time", variable.name = "well") # formatting for ggplot
     ms_nd_melted <- melt(ms_normdata, id.vars = "time", variable.name = "well") # formatting for ggplot
     
+    if (input$data_type == 1){
+      chosen_set <- ms_rd_melted
+    } else if (input$assay_type == 2){
+      chosen_set <- ms_rd_melted
+    }else {
+      chosen_set <- ms_nd_melted
+    }
+    
     calc_output <- list("ms_rawdata" = ms_rawdata, 
                         "ms_normdata" = ms_normdata, 
                         "ms_rd_melted" = ms_rd_melted, 
                         "ms_nd_melted" = ms_nd_melted,
-                        "yaxis_max" = max(ms_nd_melted$value))
+                        "chosen_set" = chosen_set,
+                        "yrange" = c(min(chosen_set$value), max(chosen_set$value)),
+                        "xrange" = c(min(chosen_set$time), max(chosen_set$time)))
+    
     return(calc_output)
     
   })
@@ -130,6 +141,11 @@ shinyServer(function(input, output) {
     
     all_means <- matrix(nrow = length(elicitors)*length(genotypes), ncol = 4, dimnames = NULL)
     all_means_graph <- matrix(nrow = length(elicitors)*length(genotypes)*length(ms_normdata[,1]), ncol = 5, dimnames = NULL)
+    
+    means <- matrix(nrow = nrow(data$ms_normdata), ncol = ncol(data$ms_normdata)) # last column stores time
+    colnames(means) <- colnames(data$ms_normdata)[1:(ncol(data$ms_normdata))]
+    means[,"time"] <- seq(0, (nrow(data$ms_rawdata)-1)*10, 10) # adds time values in seconds
+    
     i = 1
     i2 = 1
     
@@ -151,13 +167,19 @@ shinyServer(function(input, output) {
         all_means_graph[i2:(i2+length(current_rowmeans)-1),4] <- current_rowsds
         all_means_graph[i2:(i2+length(current_rowmeans)-1),5] <- seq(0, (nrow(ms_normdata)-1)*10, 10)
         
+        means[,colnames(means) %in% wells] <- current_rowmeans
+        
         i = i+1
         i2 = i2 + length(current_rowmeans)
       }
     }
     
+    df_mean <- data.frame(means)
+    mean_melted <- melt(df_mean, id.vars = "time", variable.name = "well") # formatting for ggplot
+    
     total_output <- list("all_means" = all_means,
-                         "all_means_graph" = all_means_graph)
+                         "all_means_graph" = all_means_graph,
+                         "mean_melted" = mean_melted)
     
     return(total_output)
     
@@ -167,21 +189,21 @@ shinyServer(function(input, output) {
     
     data <- calculate()
     
-    
-    if (is.null(data))
+    if ((is.null(data))||(is.null(input$ylim))||(is.null(input$xlim)))
       return(NULL)
     
-    if (input$data_type == 1){
-      chosen_set <- data$ms_rd_melted
-    } else if (input$assay_type == 2){
-      chosen_set <- data$ms_rd_melted
-    }else {
-      chosen_set <- data$ms_nd_melted
+    chosen_set <- data$chosen_set
+    
+    g <- ggplot(chosen_set, aes(time, value)) + facet_wrap(~well, ncol = 12)
+    
+    if((is.null(input$mean_overlay) == FALSE) && (input$mean_overlay)){
+      mean_melted <- mean_max_calculate()$mean_melted
+      g <- g + geom_line(data=mean_melted, aes(time, value), color = "red")
     }
     
-    g <- ggplot(chosen_set, aes(time, value)) + geom_line() + facet_wrap(~well, ncol = 12)
+    if(input$file_name){g <- g + labs(title = paste("rawdata file:", input$data_file))}
     
-    g <- g + theme_bw() + theme(
+    g <- g + geom_line() + theme_bw() + theme(
       panel.grid.minor = element_blank(),
       panel.grid.major = element_blank(),
       axis.title.x = element_blank(),
@@ -195,17 +217,21 @@ shinyServer(function(input, output) {
     )
     
     #g <- g + geom_line(data = data$ms_normdata, aes(time, A1), color = "red")
+   
     g <- g + annotate("text",
-                      x = (max(chosen_set$time)*0.85),
-                      y = (max(chosen_set$value, na.rm = TRUE)*0.9),
+                      x = (input$xlim[2]*0.85),
+                      y = (input$ylim*0.9),
                       label = colnames(data$ms_normdata)[1:(length(data$ms_normdata)-1)],
                       size = 2.5)
+    
+      g <- g + ylim(0, input$ylim) + xlim(input$xlim[1], input$xlim[2])
+
     
     
     #if (data$yaxis_max != input$ylim){
     #  g <- g + ylim(0, input$ylim)
     #}
-    
+
     return(g)
 
   })
@@ -290,13 +316,18 @@ shinyServer(function(input, output) {
     )
     
     lpmax2 <- ggplot(max_lineplot, aes(color = gen,x=time, y=mean_value)) + geom_line() + facet_wrap(~eli) + 
-      scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4")) + 
-      ggtitle("Mean with SD") +
-      geom_line(aes(x=time,y=mean_value-se), alpha=0.2)+ 
-      geom_line(aes(x=time,y=mean_value+se), alpha=0.2)+
-      geom_errorbar(aes(ymin=mean_value-se, ymax=mean_value+se), alpha=0.2,
-                    width=.2,                    # Width of the error bars
+      scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4"))
+    if(1 %in% input$settings_mean){
+      lpmax2 <- lpmax2 + ggtitle("Mean with SD") +
+        geom_line(aes(x=time,y=mean_value-se), alpha=0.2) + 
+        geom_line(aes(x=time,y=mean_value+se), alpha=0.2) +
+        geom_errorbar(aes(ymin=mean_value-se, ymax=mean_value+se), alpha=0.2,
+                    width=0,                    # Width of the error bars
                     position=position_dodge(.9))
+    } else{
+      lpmax2 <- lpmax2 + ggtitle("Mean")
+    }
+    
     lpmax2 <- lpmax2 + labs(x="", y="L/Lmax") + theme(legend.title=element_blank(),
                                                       panel.background = element_rect(fill = "white", colour = "grey90"),
                                                       panel.grid.major = element_line(color = "grey90"),
@@ -393,19 +424,59 @@ shinyServer(function(input, output) {
     }
     sliderInput("dc", "Discharge measurement points",min=0, max=20, value=15)
   })
+  output$ui.settings3 <- renderUI({
+    yrange <- calculate()$yrange
+    ylim <- yrange[2]
+    ymin <- yrange[1]
+    if (is.null(ylim)){
+      return(NULL)
+    }
+    ylim.steps = round(ylim/20, digits = 2)
+    
+#    numericInput("ylim", "y-axis limit", value = ylim, min = ymin, max = 2*ylim, step = ylim.steps)
+    sliderInput("ylim", "y-axis limit", min = floor(ymin), max = ceiling(ylim*2), value = ylim, step = ylim.steps)
+  })
   
+  output$ui.settings4 <- renderUI({
+    xrange <- calculate()$xrange
+    xlim <- xrange[2]
+    xmin <- xrange[1]
+    if (is.null(xlim)){
+      return(NULL)
+    }
+    sliderInput("xlim", "x-axis limit", min = xmin, max = xlim, value = c(xmin, xlim))
+  })
+  
+  output$ui.settings5 <- renderUI({
+    plate_layout <- get_layout()
+    if (is.null(plate_layout))
+      return(NULL)
+    checkboxInput("mean_overlay", label = "plot respective means", value = TRUE)
+  })
   
   output$menu <- renderMenu({
     
     inputlayout <- input$layout_file
     
-    sidebarMenu(
-      menuItem("Raw Data", tabName = "rawdata", icon = icon("calculator"), selected = TRUE),
-      if (is.null(inputlayout)==FALSE){
-        menuItem("Data Summary", tabName = "data_summary", icon = icon("bar-chart"),
-                menuSubItem("Mean Maxima", tabName = "norm_data1"),
-                menuSubItem("Mean Kinetics", tabName = "norm_data2"))
-      }
-    )
+    if (is.null(inputlayout)==FALSE){
+      menuItem("Data Summary", tabName = "data_summary", icon = icon("area-chart"),
+              menuSubItem("Mean Maxima", tabName = "norm_data1", icon = icon("bar-chart")),
+              menuSubItem("Mean Kinetics", tabName = "norm_data2", icon = icon("line-chart"))
+      )
+    }
+    
   })
+  
+  output$ui.plate_layout<-renderUI({
+    if (is.null(plate_layout()))
+      return(NULL)
+    
+    box(title = "Plate Layout",
+        solidHeader = TRUE,
+        status = "success",
+        width = 12,
+        collapsible = TRUE,
+        plotOutput("plate_layout", height = 300))
+  })
+  
 })
