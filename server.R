@@ -24,8 +24,7 @@ shinyServer(function(input, output) {
     
     if (input$assay_type == 2){
       dc <- 0
-    }
-    else { 
+    } else { 
       dc <- input$dc
     }
     
@@ -146,6 +145,12 @@ shinyServer(function(input, output) {
     colnames(means) <- colnames(data$ms_normdata)[1:(ncol(data$ms_normdata))]
     means[,"time"] <- seq(0, (nrow(data$ms_rawdata)-1)*10, 10) # adds time values in seconds
     
+    all_means_shaped <- matrix(nrow = 2, ncol = (length(elicitors)*length(genotypes)), dimnames = NULL)
+    sd_shaped <- all_means_shaped
+    graphs_shaped <- matrix(nrow = nrow(data$ms_normdata), ncol = (length(elicitors)*length(genotypes)), dimnames = NULL)
+    graphs_shaped_sd <- graphs_shaped
+    info <- c()
+    
     i = 1
     i2 = 1
     
@@ -161,14 +166,19 @@ shinyServer(function(input, output) {
         #print(length(c(eli, gen, current_max, current_sd)))
         #print(c(paste(gen, eli, sep = " "), current_max, current_sd))
         all_means[i,] <- c(eli, gen, current_max, current_sd)
+        all_means_shaped[1,i] <- current_max
+        sd_shaped[1,i] <- current_sd
         all_means_graph[i2:(i2+length(current_rowmeans)-1),1] <- rep(eli, length(current_rowmeans))
         all_means_graph[i2:(i2+length(current_rowmeans)-1),2] <- rep(gen, length(current_rowmeans))
         all_means_graph[i2:(i2+length(current_rowmeans)-1),3] <- current_rowmeans
         all_means_graph[i2:(i2+length(current_rowmeans)-1),4] <- current_rowsds
         all_means_graph[i2:(i2+length(current_rowmeans)-1),5] <- seq(0, (nrow(ms_normdata)-1)*10, 10)
+        graphs_shaped[,i] <- current_rowmeans
+        graphs_shaped_sd[,i] <- current_rowsds
         
         means[,colnames(means) %in% wells] <- current_rowmeans
         
+        info <- append(info, paste(gen, eli, sep = " "))
         i = i+1
         i2 = i2 + length(current_rowmeans)
       }
@@ -177,11 +187,218 @@ shinyServer(function(input, output) {
     df_mean <- data.frame(means)
     mean_melted <- melt(df_mean, id.vars = "time", variable.name = "well") # formatting for ggplot
     
+    colnames(graphs_shaped) <- info
+    colnames(graphs_shaped_sd) <- rep("SD", ncol(graphs_shaped_sd))
+    colnames(all_means_shaped) <- info
+    colnames(sd_shaped) <- rep("SD", ncol(sd_shaped))
+    graphs_shaped_w_sd <- cbind(graphs_shaped, graphs_shaped_sd)
+    graphs_shaped_w_sd <- graphs_shaped_w_sd[,c(matrix(1:ncol(graphs_shaped_w_sd), nrow = 2, byrow = TRUE))]
+    all_means_shaped_w_sd <- cbind(all_means_shaped, sd_shaped)
+    all_means_shaped_w_sd <- all_means_shaped_w_sd[,c(matrix(1:ncol(all_means_shaped_w_sd), nrow = 2, byrow = TRUE))]
+    graphs_shaped_w_sd <- cbind(seq(0, (nrow(graphs_shaped_w_sd)-1)*10, 10), graphs_shaped_w_sd)
+    colnames(graphs_shaped_w_sd)[1] <- "time"
+    graphs_shaped <- cbind(seq(0, (nrow(graphs_shaped)-1)*10, 10), graphs_shaped)
+    colnames(graphs_shaped)[1] <- "time"
     total_output <- list("all_means" = all_means,
+                         "all_means_shaped" = all_means_shaped,
+                         "all_means_shaped_w_sd" = all_means_shaped_w_sd,
                          "all_means_graph" = all_means_graph,
+                         "graphs_shaped" = graphs_shaped,
+                         "graphs_shaped_w_sd" = graphs_shaped_w_sd,
                          "mean_melted" = mean_melted)
     
     return(total_output)
+    
+  })
+  
+  ROS_calculate <- reactive({
+    
+    if(input$assay_type==1)
+      return(NULL)
+    plate_layout <- get_layout()
+    if (is.null(plate_layout))
+      return(NULL)
+    
+    raw_plate_layout <- plate_layout[,1:4]
+    raw_plate_layout <- raw_plate_layout[complete.cases(raw_plate_layout),] #delete rows with NAs
+    
+    elicitors <- unique(raw_plate_layout$elicitor)
+    genotypes <- unique(raw_plate_layout$genotype)
+    
+    data <- calculate()
+    if (is.null(data))
+      return(NULL)
+    
+    bg_values <- 10
+    how_many_bg_values <- 5
+    
+    #################################functions
+    sdom.calculate <- function(x){
+      xsdom <- sd(x)/sqrt(length(x));
+      return(xsdom)
+    }
+    
+    #calculate means and normalize to control
+    calculate.sets <- function(dataset, raw_plate_layout, sdom = TRUE){
+      
+      eli <- unique(raw_plate_layout$elicitor)
+      gen <- unique(raw_plate_layout$genotype)
+      
+      dataset_mean <- matrix(nrow = nrow(dataset), ncol = length(elicitors)*length(genotypes), dimnames = NULL)
+      dataset_sd <- matrix(nrow = nrow(dataset), ncol = length(elicitors)*length(genotypes), dimnames = NULL)
+      dataset_info <- matrix(nrow = 2, ncol = length(elicitors)*length(genotypes), dimnames = NULL)
+      
+      columnames <- c()
+      
+      i = 1
+      
+      for(eli in elicitors){
+        for(gen in genotypes){
+          wells <- raw_plate_layout$well[raw_plate_layout$elicitor == eli & raw_plate_layout$genotype == gen]
+          current_set <- dataset[colnames(dataset) %in% wells]
+          current_rowmeans <- rowMeans(current_set)
+          if(sdom){
+            current_rowsds <- apply(current_set, 1, sdom.calculate)
+          } else{
+            current_rowsds <- apply(current_set, 1, sd)
+          }
+          
+          dataset_mean[,i] <- current_rowmeans
+          dataset_sd[,i] <- current_rowsds
+          
+          dataset_info[1,i] <- gen
+          
+          dataset_info[2,i] <- eli
+          
+          
+          i = i+1
+          columnames <- append(columnames, paste(gen, eli, sep = " "))
+          
+        }
+      }
+      
+      dataset_mean <- rbind(dataset_info, dataset_mean)
+      #  dataset_sd <- rbind(dataset_info, dataset_sd)
+      
+      colnames(dataset_mean) <- columnames
+      colnames(dataset_sd) <- columnames
+      colnames(dataset_info) <- columnames
+      rownames(dataset_info) <- c("genotype", "elicitor")
+      
+      #  normed_means <- dataset_mean #dublicate dataset_mean to use frost two rows
+      normed_mean_values <- apply(dataset_mean, 2, subtract.control, dataset_mean = dataset_mean)
+      
+      #  normed_means[3:nrow(dataset_mean),] <- normed_mean_values
+      
+      output <- list("normed_means" = normed_mean_values,
+                     "dataset_means" = dataset_mean,
+                     "dataset_info" = dataset_info,
+                     "sd" = dataset_sd)
+      
+      return(output)
+    }
+    
+    #subtract background
+    subtract.background <- function(x, bg_values, how_many_bg_values, with_info = FALSE){
+      if (with_info){
+        backgroundvalues <- as.numeric(x[(3 + bg_values - how_many_bg_values):(3 + bg_values-1)])
+        mean_background <- mean(backgroundvalues)
+        normalized_values <- as.numeric(x[3:length(x)]) - mean_background
+      } else{
+        backgroundvalues <- as.numeric(x[(bg_values - how_many_bg_values):(bg_values-1)])
+        mean_background <- mean(backgroundvalues)
+        normalized_values <- as.numeric(x) - mean_background
+      }
+      
+      return(normalized_values)
+    }
+    
+    #subtract control (needed for calculate.sets)
+    subtract.control <- function(x, dataset_mean){
+      values <- as.numeric(x[3:nrow(dataset_mean)])
+      genotype <- x[1]
+      blank <- as.numeric(dataset_mean[,dataset_mean[1,]==genotype & dataset_mean[2,]=="control"][3:nrow(dataset_mean)])
+      normed_mean = values - blank
+      return(normed_mean)
+    }
+    
+    #ggplots formatting
+    annotate_type <- function(x, data_info, type){
+      type <- data_info[,colnames(data_info) == x["name"]][rownames(data_info) == type ]
+      return(type)
+    }
+    
+    #ggplots formatting
+    add_sd <- function(x, data_info, type){
+      type <- data_info[,colnames(data_info) == x["name"]][rownames(data_info) == type ]
+      return(type)
+    }
+    
+    ##################### calculations #####################
+    
+    plate_layout <- get_layout()
+    
+    if (is.null(plate_layout))
+      return(NULL)
+    
+    raw_plate_layout <- plate_layout[,1:4]
+    raw_plate_layout <- raw_plate_layout[complete.cases(raw_plate_layout),] #delete rows with NAs
+    
+    rawdata <- calculate()$ms_rawdata
+    
+    
+    #1 subtract control from measurements
+    meandata <- calculate.sets(rawdata, raw_plate_layout)
+    
+    #2 subtract background
+    normdata <- meandata$normed_means #duplicate to overwrite
+    normdata <- apply(normdata, 2, subtract.background, bg_values = bg_values, how_many_bg_values = how_many_bg_values)
+    
+    #3 prepare for plotting with ggplot2
+    rownames(normdata) <- seq(-bg_values, (nrow(normdata)-bg_values-1), 1)
+    
+    normdata_melted <- melt(normdata, varnames = c("time", "name"), value.name = "values", as.is = TRUE)
+    normdata_melted$genotype <- apply(normdata_melted, 1, annotate_type, data_info = meandata$dataset_info, type = "genotype")
+    normdata_melted$elicitor <- apply(normdata_melted, 1, annotate_type, data_info = meandata$dataset_info, type = "elicitor")
+    
+    sd <- meandata$sd
+    rownames(sd) <- seq(-bg_values, (nrow(sd)-bg_values-1), 1)
+    sd_melted <-melt(sd, varnames = c("time", "name"), value.name = "sd", as.is = TRUE)
+    normdata_melted$sd <- sd_melted$sd
+    
+    class(normdata_melted$time) <- "numeric"
+    
+    maxima <- apply(normdata[(bg_values+1):nrow(normdata),1:(ncol(normdata)-length(genotypes))], 2, max)
+    maxima_sd <- sd[normdata %in% maxima]
+    
+    maxima_melted <- melt(maxima, value.name = "values")
+    maxima_melted$name <- rownames(maxima_melted)
+    rownames(maxima_melted) <- NULL
+    maxima_sd_melted <- melt(maxima_sd, value.name = "sd")
+    
+    maxima_melted$genotype <- apply(maxima_melted, 1, annotate_type, data_info = meandata$dataset_info, type = "genotype")
+    maxima_melted$elicitor <- apply(maxima_melted, 1, annotate_type, data_info = meandata$dataset_info, type = "elicitor")
+    maxima_melted$sd <- maxima_sd_melted$sd
+    
+    sd2 <- sd
+    colnames(sd2) <- replicate(ncol(sd2), "SDOM")
+    normdata_w_sd <- cbind(normdata, sd2)
+    normdata_w_sd <- normdata_w_sd[,c(matrix(1:ncol(normdata_w_sd), nrow = 2, byrow = TRUE))]
+    normdata_w_sd <- cbind((seq(-bg_values, (nrow(normdata_w_sd)-bg_values-1), 1)), normdata_w_sd)
+    normdata <- cbind((seq(-bg_values, (nrow(normdata)-bg_values-1), 1)), normdata)
+    colnames(normdata)[1] <- "time"
+    colnames(normdata_w_sd)[1] <- "time"
+    
+    output <- list("normdata_melted" = normdata_melted,
+                   "normdata" = normdata,
+                   "normdata_sd" = sd,
+                   "normdata_w_sd" = normdata_w_sd,
+                   "maxima_melted" = maxima_melted,
+                   "maxima" = maxima,
+                   "maxima_sd" = maxima_sd,
+                   "maxima_w_sd" = cbind(maxima, maxima_sd))
+    
+    return(output)
     
   })
   
@@ -245,38 +462,47 @@ shinyServer(function(input, output) {
     
     raw_plate_layout <- plate_layout[,1:4]
     raw_plate_layout <- raw_plate_layout[complete.cases(raw_plate_layout),] #delete rows with NAs
-    
     elicitors <- unique(raw_plate_layout$elicitor)
     genotypes <- unique(raw_plate_layout$genotype)
     
-    complete_data <- mean_max_calculate()
-    
-    all_means <- complete_data$all_means
-    
-    num_all_means <- all_means[,3:4]
-    class(num_all_means) <- "numeric" # sonst werden max und se nicht alszahlen erkannt...
-    max_barplot <- data.frame(
-      eli = all_means[,1],
-      gen = factor(all_means[,2], levels = genotypes),
-      maxima = num_all_means[,1],
-      se = num_all_means[,2]
-    )
+    if (input$assay_type == 1){
+      complete_data <- mean_max_calculate()
+      all_means <- complete_data$all_means
+      
+      header <- "Maxima with SD"
+      ylabel <- "L/Lmax"
+      
+      num_all_means <- all_means[,3:4]
+      class(num_all_means) <- "numeric" # sonst werden max und se nicht alszahlen erkannt...
+      max_barplot <- data.frame(
+        elicitor = all_means[,1],
+        genotype = factor(all_means[,2], levels = genotypes),
+        values = num_all_means[,1],
+        sd = num_all_means[,2]
+      )
+    } else if (input$assay_type == 2){
+      complete_data <- ROS_calculate()
+      header <- "Maxima with SDOM"
+      ylabel <- "Relative Luminescence"
+      max_barplot <- complete_data$maxima_melted
+      
+    }
     
     if (input$bar_columns == 2){
-      bpmax <- ggplot(max_barplot, aes(fill=eli, y=maxima, x=eli)) + facet_wrap(~gen, ncol = 2) + ggtitle("Maxima with SD")
+      bpmax <- ggplot(max_barplot, aes(fill=elicitor, y=values, x=elicitor)) + facet_wrap(~genotype, ncol = 2) + ggtitle(header)
     } else {
-      bpmax <- ggplot(max_barplot, aes(fill=eli, y=maxima, x=eli)) + facet_wrap(~gen, ncol = 1) + ggtitle("Maxima with SD")
+      bpmax <- ggplot(max_barplot, aes(fill=elicitor, y=values, x=elicitor)) + facet_wrap(~genotype, ncol = 1) + ggtitle(header)
       }
     
     if(input$bar_rotation == 2){bpmax <- bpmax + coord_flip() + theme(legend.position = "none")}
     
     bpmax <- bpmax + geom_bar(position="dodge", stat="identity")
-    bpmax <- bpmax + geom_errorbar(aes(ymin=maxima-se, ymax=maxima+se),
+    bpmax <- bpmax + geom_errorbar(aes(ymin=values-sd, ymax=values+sd),
                                    width=.2,                    # Width of the error bars
                                    position=position_dodge(.9))
     
     
-    bpmax <- bpmax + labs(x="", y="L/Lmax") + theme(axis.text.x = element_text(angle = 90, size = 10, vjust = 0.5),
+    bpmax <- bpmax + labs(x="", y=ylabel) + theme(axis.text.x = element_text(angle = 90, size = 10, vjust = 0.5),
                                                     legend.title=element_blank(),
                                                     panel.background = element_rect(fill = "white", colour = "grey90"),
                                                     panel.grid.major = element_line(color = "grey90"),
@@ -301,34 +527,43 @@ shinyServer(function(input, output) {
     elicitors <- unique(raw_plate_layout$elicitor)
     genotypes <- unique(raw_plate_layout$genotype)
     
-    complete_data <- mean_max_calculate()
+    if (input$assay_type == 1){
+      complete_data <- mean_max_calculate()
+      header <- "Mean with SD"
+      ylabel <- "L/Lmax"
+      all_means_graph <- complete_data$all_means_graph
     
-    all_means_graph <- complete_data$all_means_graph
+      num_all_means_graph <- all_means_graph[,3:5]
+      class(num_all_means_graph) <- "numeric" # sonst werden max und se nicht als zahlen erkannt...
+      max_lineplot <- data.frame(
+        elicitor = all_means_graph[,1],
+        genotype = factor(all_means_graph[,2], levels = genotypes),
+        values = num_all_means_graph[,1],
+        sd = num_all_means_graph[,2],
+        time = num_all_means_graph[,3]
+      )
+    } else if(input$assay_type == 2){
+      complete_data <- ROS_calculate()
+      header <- "Mean with SDOM"
+      ylabel <- "Relative Luminescence"
+      max_lineplot <- complete_data$normdata_melted
+      
+    }
     
-    num_all_means_graph <- all_means_graph[,3:5]
-    class(num_all_means_graph) <- "numeric" # sonst werden max und se nicht alszahlen erkannt...
-    max_lineplot <- data.frame(
-      eli = all_means_graph[,1],
-      gen = factor(all_means_graph[,2], levels = genotypes),
-      mean_value = num_all_means_graph[,1],
-      se = num_all_means_graph[,2],
-      time = num_all_means_graph[,3]
-    )
-    
-    lpmax2 <- ggplot(max_lineplot, aes(color = gen,x=time, y=mean_value)) + geom_line() + facet_wrap(~eli) + 
+    lpmax2 <- ggplot(max_lineplot, aes(color = genotype,x=time, y=values)) + geom_line() + facet_wrap(~elicitor) + 
       scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4"))
     if(1 %in% input$settings_mean){
-      lpmax2 <- lpmax2 + ggtitle("Mean with SD") +
-        geom_line(aes(x=time,y=mean_value-se), alpha=0.2) + 
-        geom_line(aes(x=time,y=mean_value+se), alpha=0.2) +
-        geom_errorbar(aes(ymin=mean_value-se, ymax=mean_value+se), alpha=0.2,
+      lpmax2 <- lpmax2 + ggtitle(header) +
+        geom_line(aes(x=time,y=values-sd), alpha=0.2) + 
+        geom_line(aes(x=time,y=values+sd), alpha=0.2) +
+        geom_errorbar(aes(ymin=values-sd, ymax=values+sd), alpha=0.2,
                     width=0,                    # Width of the error bars
                     position=position_dodge(.9))
     } else{
       lpmax2 <- lpmax2 + ggtitle("Mean")
     }
     
-    lpmax2 <- lpmax2 + labs(x="", y="L/Lmax") + theme(legend.title=element_blank(),
+    lpmax2 <- lpmax2 + labs(x="", y=ylabel) + theme(legend.title=element_blank(),
                                                       panel.background = element_rect(fill = "white", colour = "grey90"),
                                                       panel.grid.major = element_line(color = "grey90"),
                                                       strip.background = element_rect(fill = "grey90", colour = NA),
@@ -361,8 +596,6 @@ shinyServer(function(input, output) {
   output$ui.downloaddata <- renderUI({
     if (is.null(calculate())) 
       return(NULL)
-    if (input$assay_type == 2)
-      return(NULL)
     downloadButton('downloadData', 'Download Data')
   })
   output$downloadData <- downloadHandler(
@@ -370,13 +603,36 @@ shinyServer(function(input, output) {
     filename = function() {paste0("norm_", gsub(unlist(strsplit(input$data_file$name, "[.]")[1])[-1], "", input$data_file$name), "xlsx")},
     content = function(file) {
       data <- calculate()
+      ROSdata <- ROS_calculate()
+      CaMean <- mean_max_calculate()
       #writeWorksheetToFile(file, data = data$ms_normdata, sheet = "normalized data")
       fname <- paste0("norm_", gsub(unlist(strsplit(input$data_file$name, "[.]")[1])[-1], "", input$data_file$name), "xlsx")
       wb <- loadWorkbook(fname, create = TRUE)
       createSheet(wb, name = "raw data")
       writeWorksheet(wb, data$ms_rawdata, sheet = "raw data")
-      createSheet(wb, name = "normalized data")
-      writeWorksheet(wb, data$ms_normdata, sheet = "normalized data")
+      if(input$assay_type== 1){
+        createSheet(wb, name = "normalized data")
+        writeWorksheet(wb, data$ms_normdata, sheet = "normalized data")}
+      if((is.null(ROSdata)==FALSE)||(is.null(CaMean)==FALSE)){
+        createSheet(wb, name = "mean data")
+        createSheet(wb, name = "maxima")
+        if(input$assay_type==1){
+          writeWorksheet(wb, CaMean$graphs_shaped, sheet = "mean data")
+          writeWorksheet(wb, CaMean$all_means_shaped, sheet = "maxima")
+          createSheet(wb, name = "mean data with sd")
+          createSheet(wb, name = "maxima with sd")
+          writeWorksheet(wb, CaMean$graphs_shaped_w_sd, sheet = "mean data with sd")
+          writeWorksheet(wb, CaMean$all_means_shaped_w_sd, sheet = "maxima with sd")
+          }
+        if(input$assay_type==2){
+          writeWorksheet(wb, ROSdata$normdata, sheet = "mean data")
+          writeWorksheet(wb, ROSdata$maxima, sheet = "maxima")
+          createSheet(wb, name = "mean data with sdom")
+          createSheet(wb, name = "maxima with sdom")
+          writeWorksheet(wb, ROSdata$normdata_w_sd, sheet = "mean data with sdom")
+          writeWorksheet(wb, ROSdata$maxima_w_sd, sheet = "maxima with sdom")
+        }
+      }
       saveWorkbook(wb)
       file.rename(fname,file)
     
@@ -449,13 +705,12 @@ shinyServer(function(input, output) {
   
   output$ui.settings5 <- renderUI({
     plate_layout <- get_layout()
-    if (is.null(plate_layout))
+    if ((is.null(plate_layout))||(input$assay_type == 2))
       return(NULL)
     checkboxInput("mean_overlay", label = "plot respective means", value = TRUE)
   })
   
-  output$menu <- renderMenu({
-    
+  output$menu1 <- renderMenu({
     inputlayout <- input$layout_file
     
     if (is.null(inputlayout)==FALSE){
@@ -463,10 +718,16 @@ shinyServer(function(input, output) {
               menuSubItem("Mean Maxima", tabName = "norm_data1", icon = icon("bar-chart")),
               menuSubItem("Mean Kinetics", tabName = "norm_data2", icon = icon("line-chart"))
       )
-    }
-    
+    } 
   })
   
+  output$menu2 <- renderMenu({
+    inputfile <- input$data_file
+    if (is.null(inputfile)==FALSE){
+      menuItem("Download", tabName = "download", icon = icon("cloud-download"))
+    }
+  })
+    
   output$ui.plate_layout<-renderUI({
     if (is.null(plate_layout()))
       return(NULL)

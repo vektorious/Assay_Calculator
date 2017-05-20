@@ -12,8 +12,9 @@ dashboardPage(skin = "green",
   dashboardSidebar(
     sidebarMenu(
       menuItem("Raw Data", tabName = "rawdata", icon = icon("calculator"), selected = TRUE),
-      menuItemOutput("menu")
-#      menuItem("Download", tabName = "download", icon = icon("download"))
+      menuItemOutput("menu1"),
+      menuItemOutput("menu2")
+
     ),
     fileInput("data_file", label = h4("Data file input"), accept = c(".xls", ".xlsx")),
     fileInput("layout_file", label = h4("Layout file input (optional)"), accept = c(".xls", ".xlsx"))
@@ -57,9 +58,7 @@ dashboardPage(skin = "green",
               hr(),
               uiOutput("ui.settings2"),
               uiOutput("ui.settings3"),
-              uiOutput("ui.settings4"),
-              uiOutput("ui.downloaddata"),
-              uiOutput("ui.downloadplot")
+              uiOutput("ui.settings4")
           )
         ),
         fluidRow(
@@ -106,6 +105,11 @@ dashboardPage(skin = "green",
                                    choices = list("Show SD (takes time!)" = 1))
                 )
           )
+        ),
+      tabItem(tabName = "download",
+             h3("Dowload Everything!"),
+             uiOutput("ui.downloaddata"),
+             uiOutput("ui.downloadplot")
         )
       )
     )
