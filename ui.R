@@ -11,7 +11,8 @@ dashboardPage(skin = "green",
   
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Raw Data", tabName = "rawdata", icon = icon("calculator"), selected = TRUE),
+      menuItem("Instructions", tabName = "instructions", icon = icon("map"), selected = TRUE),
+      menuItem("Data Analysis", tabName = "rawdata", icon = icon("calculator"), selected = FALSE),
       menuItemOutput("menu1"),
       menuItemOutput("menu2")
 
@@ -34,6 +35,57 @@ dashboardPage(skin = "green",
       }
     '))),
     tabItems(
+      tabItem(tabName = "instructions",
+          HTML("<center><h1><strong>Welcome to Assay Calculator</strong></h1><h6>Version 2.1 (21.05.2017)</h6></center>"),
+          br(),
+          div(class="body", style="font-size:120%",
+              HTML("<p>This web application is designed to help you to analyse your data.
+                   <br> 
+                   For now it can process data you obtained from aequorin luminescence measurements (<strong>'Calcium Assay'</strong>) or ROS measurements (<strong>'ROS Assay'</strong>)
+                   <br>
+                   <br>
+                   To view well plots and to start the calculations open the 'Data Analysis' tab.
+                   <strong><h3>Here are some things you have to keep in mind:</h3></strong>
+                   <li>Input files have to be .xls or .xlsx files</li>
+                   <li>Data has to be formatted accordingly</li>
+                   <li>Plate layout is optional but required for ROS Assay normalization and mean/maxima calculation</li>
+                   <li><strong>ROS layout: Put 'blank' in elicitor column for measurements used for blanking</strong></li>
+                   <li>Calculations take their time! Be patient!</li></p>"),
+              HTML("<h3><strong>Download example data or empty templates:</strong></h3>"),
+              tags$li(div(style="display:inline-block",
+                    p("Get")),
+                downloadLink('downloadCaExample', 'Calcium Assay data'),
+                div(style="display:inline-block",
+                    p("and")),
+                downloadLink('downloadCaExample_layout', 'Calcium Assay plate layout')),
+              tags$li(div(style="display:inline-block",
+                    p("Get")),
+                downloadLink('downloadROSExample', 'ROS Assay data'),
+                div(style="display:inline-block",
+                    p("and")),
+                downloadLink('downloadROSExample_layout', 'ROS Assay plate layout')),
+              tags$li(div(style="display:inline-block",
+                    p("Get empty")),
+                downloadLink('downloadDatatemplate', 'data template'),
+                div(style="display:inline-block",
+                    p("and")),
+                downloadLink('downloadLayouttemplate', 'plate layout template')  
+              )),
+          hr(),
+          div(style="display:inline-block",
+            p("This web application was created by Alexander Kutschera (TU Munich) as a OpenPlantScience community project.")),
+          div(style="display:inline-block",
+              p("Please feel free and send me your ")),
+          div(style="display:inline-block",
+              a(href="mailto:alexander.kutschera@tum.de", "feedback!")
+          ),
+          div(style="display:inline-block",
+              p("Assay Calculator is licenced with the ")),
+          downloadLink('downloadLicense', 'GNU General Public License v3.0')
+
+
+
+      ),
       tabItem(tabName = "rawdata",
         fluidRow(
           box(title = "Well Curves",
@@ -48,14 +100,14 @@ dashboardPage(skin = "green",
               status = "success",
               width = 3,
 #              collapsible = TRUE,
-              radioButtons(inputId="assay_type", label=h4("Assay Type"), 
+              radioButtons(inputId="assay_type", label="Assay Type:", 
                           choices = list("Calcium Assay" = 1, "ROS Assay" = 2),
                           selected = 1),   
               uiOutput("ui.settings1"),
               hr(),
-              checkboxInput("file_name", label = "write filename as header", value = TRUE),
+              h4("Options"),
+              checkboxInput("file_name", label = "Write filename as header", value = TRUE),
               uiOutput("ui.settings5"),
-              hr(),
               uiOutput("ui.settings2"),
               uiOutput("ui.settings3"),
               uiOutput("ui.settings4")
@@ -106,10 +158,25 @@ dashboardPage(skin = "green",
                 )
           )
         ),
-      tabItem(tabName = "download",
-             h3("Dowload Everything!"),
-             uiOutput("ui.downloaddata"),
-             uiOutput("ui.downloadplot")
+      tabItem(tabName = "download", 
+             h3("Download Everything!"),
+             box(title = "Download Data",
+                 width = 4,
+                 solidHeader = TRUE,
+                 status = "success",
+                 uiOutput("ui.downloaddata"),
+                 checkboxGroupInput("settings_data_download1", label = h5("General Setting"), 
+                                    choices = list("Add graphs to Excel file" = 1))
+             ),
+             box(title = "Download Plots",
+                 width = 4,
+                 solidHeader = TRUE,
+                 status = "success",
+                 uiOutput("ui.downloadplot")
+#                 checkboxGroupInput("settings_data_download1", label = h5("General Setting"), 
+#                                   choices = list("Add graphs to Excel file" = 1))
+             )
+             
         )
       )
     )

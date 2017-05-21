@@ -605,6 +605,10 @@ shinyServer(function(input, output) {
       data <- calculate()
       ROSdata <- ROS_calculate()
       CaMean <- mean_max_calculate()
+      wellplot <- well_plots()
+      layout <- plate_layout()
+      barplot <- bar_plots_max()
+      mean_graph <- mean_graphs()
       #writeWorksheetToFile(file, data = data$ms_normdata, sheet = "normalized data")
       fname <- paste0("norm_", gsub(unlist(strsplit(input$data_file$name, "[.]")[1])[-1], "", input$data_file$name), "xlsx")
       wb <- loadWorkbook(fname, create = TRUE)
@@ -631,6 +635,32 @@ shinyServer(function(input, output) {
           createSheet(wb, name = "maxima with sdom")
           writeWorksheet(wb, ROSdata$normdata_w_sd, sheet = "mean data with sdom")
           writeWorksheet(wb, ROSdata$maxima_w_sd, sheet = "maxima with sdom")
+        }
+        if(input$assay_type==1){
+          png("wellplot.png", width = 1200, height = 1100)
+          invisible(print(wellplot))
+          dev.off()
+          createSheet(wb, name = "wellplots")
+          createName(wb, name = "well_plots", formula = "wellplots!$B$2")
+          addImage(wb, filename = "wellplot.png", name = "well_plots", originalSize = TRUE)
+          png("layout.png", width = 600, height = 600)
+          invisible(print(layout))
+          dev.off()
+          createSheet(wb, name = "platelayout")
+          createName(wb, name = "plate_layout", formula = "platelayout!$B$2")
+          addImage(wb, filename = "layout.png", name = "plate_layout", originalSize = TRUE)
+          png("barplot.png", width = 900, height = 900)
+          invisible(print(barplot))
+          dev.off()
+          createSheet(wb, name = "maximabarplots")
+          createName(wb, name = "maxima_bar_plots", formula = "maximabarplots!$B$2")
+          addImage(wb, filename = "barplot.png", name = "maxima_bar_plots", originalSize = TRUE)
+          png("mean_graph.png", width = 1200, height = 1200)
+          invisible(print(mean_graph))
+          dev.off()
+          createSheet(wb, name = "meangraphs")
+          createName(wb, name = "mean_graphs", formula = "meangraphs!$B$2")
+          addImage(wb, filename = "mean_graph.png", name = "mean_graphs", originalSize = TRUE)
         }
       }
       saveWorkbook(wb)
@@ -664,9 +694,72 @@ shinyServer(function(input, output) {
     }
   )
   
+  output$downloadLicense <- downloadHandler(
+    filename <- function(){
+      paste("license", "txt", sep = ".")
+    },
+    content <-function(file){
+      file.copy("license.txt", file)
+    }
+  )
+  
+  output$downloadCaExample <- downloadHandler(
+    filename <- function(){
+      paste("CaExample", "xlsx", sep = ".")
+    },
+    content <-function(file){
+      file.copy("CaExample.xlsx", file)
+    }
+  )
+  
+  output$downloadCaExample_layout <- downloadHandler(
+    filename <- function(){
+      paste("CaExample_layout", "xlsx", sep = ".")
+    },
+    content <-function(file){
+      file.copy("CaExample_layout.xlsx", file)
+    }
+  )
+  
+  output$downloadROSExample <- downloadHandler(
+    filename <- function(){
+      paste("ROSExample", "xlsx", sep = ".")
+    },
+    content <-function(file){
+      file.copy("ROSExample.xlsx", file)
+    }
+  )
+  
+  output$downloadROSExample_layout <- downloadHandler(
+    filename <- function(){
+      paste("ROSExample_layout", "xlsx", sep = ".")
+    },
+    content <-function(file){
+      file.copy("ROSExample_layout.xlsx", file)
+    }
+  )
+  
+  output$downloadDatatemplate <- downloadHandler(
+    filename <- function(){
+      paste("Datatemplate", "xlsx", sep = ".")
+    },
+    content <-function(file){
+      file.copy("Datatemplate.xlsx", file)
+    }
+  )
+  
+  output$downloadLayouttemplate <- downloadHandler(
+    filename <- function(){
+      paste("Layouttemplate", "xlsx", sep = ".")
+    },
+    content <-function(file){
+      file.copy("Layouttemplate.xlsx", file)
+    }
+  )
+  
   output$ui.settings1 <- renderUI({
     if (input$assay_type == 2){
-      HTML("At the moment it is only possible to view and download raw data graphs for ROS measurements! <br/> <br/> <div><span style='color:red'>Keep in mind that the data has to be in the 'Luminoscan' format!</span></div>")
+      HTML("<div><span style='color:red'>Keep in mind that the data has to be in the 'Luminoscan' format! </br> (for now, soon to be updated!)</span></div>")
     } else{
     radioButtons(inputId="data_type",
                  label="Show graphs for:",
@@ -707,7 +800,7 @@ shinyServer(function(input, output) {
     plate_layout <- get_layout()
     if ((is.null(plate_layout))||(input$assay_type == 2))
       return(NULL)
-    checkboxInput("mean_overlay", label = "plot respective means", value = TRUE)
+    checkboxInput("mean_overlay", label = "plot respective means", value = FALSE)
   })
   
   output$menu1 <- renderMenu({
