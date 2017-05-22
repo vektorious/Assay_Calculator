@@ -49,7 +49,7 @@ dashboardPage(skin = "green",
                    <li>Input files have to be .xls or .xlsx files</li>
                    <li>Data has to be formatted accordingly</li>
                    <li>Plate layout is optional but required for ROS Assay normalization and mean/maxima calculation</li>
-                   <li><strong>ROS layout: Put 'blank' in elicitor column for measurements used for blanking</strong></li>
+                   <li><strong>ROS layout: Put 'control' in elicitor column for measurements used for blanking</strong></li>
                    <li>Calculations take their time! Be patient!</li></p>"),
               HTML("<h3><strong>Download example data or empty templates:</strong></h3>"),
               tags$li(div(style="display:inline-block",
