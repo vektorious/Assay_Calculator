@@ -603,8 +603,10 @@ shinyServer(function(input, output) {
     filename = function() {paste0("norm_", gsub(unlist(strsplit(input$data_file$name, "[.]")[1])[-1], "", input$data_file$name), "xlsx")},
     content = function(file) {
       data <- calculate()
-      ROSdata <- ROS_calculate()
-      CaMean <- mean_max_calculate()
+      ROSdata <- NULL
+      CaMean <- NULL
+      if(input$assay_type==1){CaMean <- mean_max_calculate()}
+      if(input$assay_type==2){CaMean <- ROSdata <- ROS_calculate()}
       wellplot <- well_plots()
       layout <- plate_layout()
       barplot <- bar_plots_max()
