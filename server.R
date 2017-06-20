@@ -368,7 +368,8 @@ shinyServer(function(input, output) {
     
     class(normdata_melted$time) <- "numeric"
     
-    maxima <- apply(normdata[(bg_values+1):nrow(normdata),1:(ncol(normdata)-length(genotypes))], 2, max)
+    maxima <- apply(normdata[(bg_values+1):nrow(normdata),1:ncol(normdata)], 2, max)
+    maxima <- maxima[!grepl("control", names(maxima))] # removes control values
     maxima_sd <- sd[normdata %in% maxima]
     
     maxima_melted <- melt(maxima, value.name = "values")
