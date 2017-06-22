@@ -7,21 +7,23 @@ library(reshape2)
 library(grid)
 library(shinydashboard)
 
+##################### functions #####################
+
+#normalising one well for calcium measurements
+
+norm.well <- function(x){
+  if(sum(x) == 0) return(x) #avoids errors in empty sets
+  cs <- rev(cumsum(rev(x))); #cumulative sum
+  xn <- x/(10*(cs))*1000; #correction factor 10 because of timepoints
+  return(xn)
+}
+
+####################################################
+
 shinyServer(function(input, output) {
 
   calculate <- reactive({
-    
-    ##################### functions #####################
-    
-    #normalising one well
-    norm.well <- function(x){
-      cs <- rev(cumsum(rev(x))); #cumulative sum
-      xn <- x/(10*(cs))*1000;
-      return(xn)
-    }
-    
-    ####################################################
-    
+
     if (input$assay_type == 2){
       dc <- 0
     } else { 
@@ -29,9 +31,7 @@ shinyServer(function(input, output) {
     }
     
     inputfile <- input$data_file
-    
-    if (is.null(inputfile))
-      return(NULL)
+    if (is.null(inputfile)) return(NULL)
     
     rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
     colnames(rawdata) <- gsub("M.", "", colnames(rawdata))

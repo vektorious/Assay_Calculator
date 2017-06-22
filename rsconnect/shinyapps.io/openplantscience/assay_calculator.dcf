@@ -1,22 +1,10 @@
-name: assay_calculator
+name: Assay_Calculator
 title: Assay_Calculator
 account: openplantscience
 server: shinyapps.io
 appId: 180631
-<<<<<<< Updated upstream
-bundleId: 877957
+bundleId: 878849
 url: https://openplantscience.shinyapps.io/assay_calculator/
-when: 1498123930.06927
-=======
-<<<<<<< HEAD
-bundleId: 836568
-url: https://openplantscience.shinyapps.io/assay_calculator/
-when: 1495482336.22404
-=======
-bundleId: 877957
-url: https://openplantscience.shinyapps.io/assay_calculator/
-when: 1498123930.06927
->>>>>>> origin/master
->>>>>>> Stashed changes
+when: 1498160723.76312
 asMultiple: FALSE
 asStatic: FALSE
