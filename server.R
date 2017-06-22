@@ -552,7 +552,7 @@ shinyServer(function(input, output) {
     }
     
     lpmax2 <- ggplot(max_lineplot, aes(color = genotype,x=time, y=values)) + geom_line() + facet_wrap(~elicitor) + 
-      scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4"))
+      scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4", "moccasin", "blue2", "maroon4", "turquoise4", "purple3", "pink3"))
     if(1 %in% input$settings_mean){
       lpmax2 <- lpmax2 + ggtitle(header) +
         geom_line(aes(x=time,y=values-sd), alpha=0.2) + 
