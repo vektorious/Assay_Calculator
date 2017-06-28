@@ -11,10 +11,11 @@ dashboardPage(skin = "green",
   
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Instructions", tabName = "instructions", icon = icon("map"), selected = TRUE),
-      menuItem("Data Analysis", tabName = "rawdata", icon = icon("calculator"), selected = FALSE),
+      menuItem("Instructions", tabName = "instructions", icon = icon("commenting-o"), selected = FALSE),
+      menuItem("Data Analysis", tabName = "rawdata", icon = icon("calculator"), selected = TRUE),
       menuItemOutput("menu1"),
-      menuItemOutput("menu2")
+      menuItemOutput("menu2"),      
+      menuItem("Mapping", tabName = "mapping", icon = icon("map-o"), selected = FALSE)
 
     ),
     fileInput("data_file", label = h4("Data file input"), accept = c(".xls", ".xlsx")),
@@ -158,6 +159,54 @@ dashboardPage(skin = "green",
                 )
           )
         ),
+
+      tabItem(tabName = "mapping",
+          fluidRow(  
+            box(title = "Mapping Data",
+                solidHeader = TRUE,
+                status = "success",
+                width = 12,
+                collapsible = TRUE,
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q1_file", label = h4("Quadrant 1 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q2_file", label = h4("Quadrant 2 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q3_file", label = h4("Quadrant 3 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q4_file", label = h4("Quadrant 4 data input"), accept = c(".txt"))),
+                br(),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q1_file", label = h4("Quadrant 1 discharge data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q2_file", label = h4("Quadrant 2 discharge data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q3_file", label = h4("Quadrant 3 discharge data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q4_file", label = h4("Quadrant 4 discharge ata input"), accept = c(".txt"))),
+                hr(),
+                h4("Options"),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N1_file", label = h4("Quadrant WT 1 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N2_file", label = h4("Quadrant WT 2 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N3_file", label = h4("Quadrant WT 3 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N4_file", label = h4("Quadrant WT 4 data input"), accept = c(".txt"))),                
+                uiOutput("ui.settings1"),
+                hr(),
+                h4("Options"),
+                checkboxInput("file_name", label = "Write filename as header", value = TRUE),
+                uiOutput("ui.settings5"),
+                uiOutput("ui.settings2"),
+                uiOutput("ui.settings3"),
+                uiOutput("ui.settings4")
+          )
+        ),
+
+          fluidRow(
+            box(title = "Well Curves",
+                solidHeader = TRUE,
+                status = "success",
+                #              background = "black",
+                width = 12,
+                collapsible = FALSE,
+                plotOutput("plot", height = 600))),        
+        
+        fluidRow(
+          uiOutput("ui.plate_layout")
+        )
+),
+
       tabItem(tabName = "download", 
              h3("Download Everything!"),
              box(title = "Download Data",
