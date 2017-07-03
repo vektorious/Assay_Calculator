@@ -16,7 +16,7 @@ dashboardPage(skin = "green",
       menuItemOutput("menu1"),
       menuItem("Mapping Tools", tabName = "mapping", icon = icon("map-o"), selected = FALSE,
                menuSubItem("Combine Files", tabName = "combine", icon = icon("cogs")),
-               menuSubItem("Wellcurves", tabName = "mapping_wellcurves", icon = icon("calculator"))),
+               menuSubItem("Mapping Wellcurves", tabName = "mapping_wellcurves", icon = icon("calculator"))),
       menuItemOutput("menu2")
 
     ),
@@ -159,7 +159,7 @@ dashboardPage(skin = "green",
                 checkboxGroupInput("settings_mean", label = h5("General Setting"), 
                                    choices = list("Show SD (takes time!)" = 1)),
                 radioButtons(inputId="graph_sorting", label=h4("Sort graphs by"), 
-                             choices = list("Elcicitor" = 1, "Genotype" = 2),
+                             choices = list("Elicitor" = 1, "Genotype" = 2),
                              selected = 1)
                 )
           )
@@ -188,6 +188,33 @@ dashboardPage(skin = "green",
           )
         )
 ),
+      tabItem(tabName = "mapping_wellcurves",
+            fluidRow(
+              box(title = "Well Curves Settings",
+                  solidHeader = TRUE,
+                  status = "success",
+                  width = 12,
+                  collapsible = TRUE,
+                  h4("Upload assay data with wildtype plants for comparison"),
+                  div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("WT_file", label = h6("Wildtype data input (optional)"), accept = c(".csv"))),
+                  br(),
+                  div(style="display: inline-block;vertical-align:mid; width: 150px;", checkboxInput("mean_overlay_WT", label = "plot WT mean", value = FALSE)),
+                  div(style="display: inline-block;vertical-align:mid; width: 150px;",checkboxInput("mean_overlay_plate", label = "plot plate mean", value = FALSE))
+              )
+            ),          
+              
+          fluidRow(
+            box(title = "Mapping Well Curves",
+                solidHeader = TRUE,
+                status = "success",
+                #              background = "black",
+                width = 12,
+                collapsible = FALSE,
+                plotOutput("mappingplot", height = 900))
+          )
+
+),
+
 
       tabItem(tabName = "download", 
              h3("Download Everything!"),
@@ -197,15 +224,16 @@ dashboardPage(skin = "green",
                  status = "success",
                  uiOutput("ui.downloaddata"),
                  checkboxGroupInput("settings_data_download1", label = h5("General Setting"), 
-                                    choices = list("Add graphs to Excel file" = 1))
+                                    choices = list("Add graphs to Excel file" = 1,
+                                                   "Don't add mean data" = 2))
              ),
              box(title = "Download Plots",
                  width = 4,
                  solidHeader = TRUE,
                  status = "success",
-                 uiOutput("ui.downloadplot")
-#                 checkboxGroupInput("settings_data_download1", label = h5("General Setting"), 
-#                                   choices = list("Add graphs to Excel file" = 1))
+                 uiOutput("ui.downloadplot"),
+                 checkboxGroupInput("settings_plot_download1", label = h5("General Setting"), 
+                                   choices = list("Don't add mean data" = 1))
              )
              
         )

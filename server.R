@@ -40,8 +40,11 @@ curateQ <- function(QE = NULL, QD = NULL){
     index = index + 73
   }
   
-  QE_curated[1,] <- gsub("M.", "", QE_curated[1,])
+  #QE_curated[1,] <- gsub("M.", "", QE_curated[1,])
   colnames(QE_curated) <- QE_curated[1,]
+  newcolnames <- unlist(strsplit(colnames(QE_curated), ".", fixed = TRUE))
+  colnames(QE_curated) <- newcolnames[!newcolnames=="M"]
+  
   QE_curated <- QE_curated[2:nrow(QE_curated),]
   QE_curated <- apply(QE_curated, 2, type.convert, dec = ",")
   
@@ -60,15 +63,22 @@ curateQ <- function(QE = NULL, QD = NULL){
     }
     index = index + 7
   }
+
   
-  QD_curated[1,] <- gsub("M.", "", QD_curated[1,])
+#  QD_curated[1,] <- gsub("M.", "", QD_curated[1,])
+  
   colnames(QD_curated) <- QD_curated[1,]
+  newcolnames <- unlist(strsplit(colnames(QD_curated), ".", fixed = TRUE))
+  colnames(QD_curated) <- newcolnames[!newcolnames=="M"]
+  
   QD_curated <- QD_curated[2:nrow(QD_curated),]
   QD_curated <- apply(QD_curated, 2, type.convert, dec = ",")
   
   Q_curated <- rbind(QE_curated, QD_curated)
   Q_curated_df <- data.frame(Q_curated, row.names = NULL)
   Q_curated_df[is.na(Q_curated_df)] = 0
+  newcolnames <- unlist(strsplit(colnames(Q_curated_df), ".", fixed = TRUE))
+  colnames(Q_curated_df) <- newcolnames[!newcolnames=="M"]
   
   return(Q_curated_df)
 }
@@ -76,6 +86,45 @@ curateQ <- function(QE = NULL, QD = NULL){
 ####################################################
 
 shinyServer(function(input, output){
+  
+  calculate_plate_mean <- reactive({
+    
+    dc <- input$dc
+    
+    inputfile <- input$WT_file
+    
+    if (is.null(inputfile)) return(NULL)
+    
+    if((tools::file_ext(inputfile[1]) == "xlsx")||(tools::file_ext(inputfile[1]) == "xls")){
+      rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
+    } else if (tools::file_ext(inputfile[1]) == "csv"){
+      rawdata <- read.csv(inputfile$datapath)
+    }
+    
+    #colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
+    newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
+    colnames(rawdata) <- newcolnames[!newcolnames=="M"]
+    rawdata[is.na(rawdata)]=0
+    
+    
+    #normdata <- apply(rawdata, 2, norm.well) #w/o dependencies 
+    normdata <- colwise(norm.well)(rawdata) # colwise needs library(plyr)
+    
+    ms_normdata <- normdata[1:(nrow(normdata)-dc),] # isolates MS values of normalized data
+    
+    ms_normdata$time <- seq(0, (nrow(ms_normdata)-1)*10, 10) # adds time values in seconds
+    
+    ms_normdata[colSums(ms_normdata)==0] <- NA
+    
+    plate_mean <- matrix(ncol = 2, nrow = nrow(ms_normdata))
+    plate_mean[,1] <- ms_normdata$time
+    plate_mean[,2] <- rowMeans(ms_normdata[!ms_normdata$time], na.rm = TRUE)
+    plate_mean <- data.frame(plate_mean)
+    colnames(plate_mean) <- c("time", "values")
+    
+    return(plate_mean)
+    
+  })
   
   calculate <- reactive({
 
@@ -92,7 +141,9 @@ shinyServer(function(input, output){
     } else if (tools::file_ext(inputfile[1]) == "csv"){
       rawdata <- read.csv(inputfile$datapath)
     }
-    colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
+    #colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
+    newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
+    colnames(rawdata) <- newcolnames[!newcolnames=="M"]
     rawdata[is.na(rawdata)]=0
   
     
@@ -107,6 +158,16 @@ shinyServer(function(input, output){
     
     ms_rd_melted <- melt(ms_rawdata, id.vars = "time", variable.name = "well") # formatting for ggplot
     ms_nd_melted <- melt(ms_normdata, id.vars = "time", variable.name = "well") # formatting for ggplot
+    
+    ms_normdata_copy <- ms_normdata
+    
+    ms_normdata_copy[colSums(ms_normdata_copy)==0] <- NA
+    
+    plate_mean <- matrix(ncol = 2, nrow = nrow(ms_normdata_copy))
+    plate_mean[,1] <- ms_normdata_copy$time
+    plate_mean[,2] <- rowMeans(ms_normdata_copy[!ms_normdata_copy$time])
+    plate_mean <- data.frame(plate_mean)
+    colnames(plate_mean) <- c("time", "values")
     
     if (input$data_type == 1){
       chosen_set <- ms_rd_melted
@@ -130,7 +191,8 @@ shinyServer(function(input, output){
                         "chosen_set" = chosen_set,
                         "yrange" = c(min(chosen_set$value), max(chosen_set$value)),
                         "xrange" = c(min(chosen_set$time), max(chosen_set$time)),
-                        "well_plate" = well_plate)
+                        "well_plate" = well_plate,
+                        "plate_mean" = plate_mean)
     
     return(calc_output)
     
@@ -148,13 +210,18 @@ shinyServer(function(input, output){
                            Row=as.numeric(match(toupper(substr(well, 1, 1)), LETTERS)),
                            Column=as.numeric(substr(well, 2, 5)))
     
-    return(plate_layout)
+    empty_wells <- raw_plate_layout$well[is.na(raw_plate_layout$elicitor) & is.na(raw_plate_layout$genotype)]
+    
+    output <- list("empty_wells" = empty_wells,
+                   "plate_layout" = plate_layout)
+    
+    return(output)
     
   })
   
   plate_layout <- reactive({
     
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     well_plate <- calculate()$well_plate
     
     if (is.null(plate_layout))
@@ -198,13 +265,14 @@ shinyServer(function(input, output){
   
   mean_max_calculate <- reactive({
     
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     
     if (is.null(plate_layout))
       return(NULL)
     
     raw_plate_layout <- plate_layout[,1:4]
     raw_plate_layout <- raw_plate_layout[complete.cases(raw_plate_layout),] #delete rows with NAs
+    
     
     elicitors <- unique(raw_plate_layout$elicitor)
     genotypes <- unique(raw_plate_layout$genotype)
@@ -293,7 +361,7 @@ shinyServer(function(input, output){
     
     if(input$assay_type==1)
       return(NULL)
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     if (is.null(plate_layout))
       return(NULL)
     
@@ -414,7 +482,7 @@ shinyServer(function(input, output){
     
     ##################### calculations #####################
     
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     
     if (is.null(plate_layout))
       return(NULL)
@@ -490,6 +558,12 @@ shinyServer(function(input, output){
     
     chosen_set <- data$chosen_set
     
+    empty_wells <- get_layout()$empty_wells
+    
+    if(is.null(empty_wells) == FALSE){
+      chosen_set$value[chosen_set$well %in% empty_wells] <- 0
+    }
+    
     g <- ggplot(chosen_set, aes(time, value)) 
     
     if(data$well_plate == 384){
@@ -502,6 +576,16 @@ shinyServer(function(input, output){
     if((is.null(input$mean_overlay) == FALSE) && (input$mean_overlay)){
       mean_melted <- mean_max_calculate()$mean_melted
       g <- g + geom_line(data=mean_melted, aes(time, value), color = "red")
+    }
+    
+    
+    if((is.null(input$mean_overlay_plate) == FALSE) && (input$mean_overlay_plate)){
+      g <- g + geom_line(data=data$plate_mean, aes(time, values), color = "limegreen")
+    }
+    
+    if((is.null(input$mean_overlay_WT) == FALSE) && (input$mean_overlay_WT)){
+      WTplate_mean <- calculate_plate_mean()
+      g <- g + geom_line(data=WTplate_mean, aes(time, values), color = "blue")
     }
     
     if(input$file_name){g <- g + labs(title = paste("rawdata file:", input$data_file))}
@@ -539,9 +623,10 @@ shinyServer(function(input, output){
 
   })
   
+  
   bar_plots_max <- reactive({
     
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     
     if (is.null(plate_layout))
       return(NULL)
@@ -602,7 +687,7 @@ shinyServer(function(input, output){
   
   mean_graphs <- reactive({
     
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     
     if (is.null(plate_layout))
       return(NULL)
@@ -667,6 +752,11 @@ shinyServer(function(input, output){
   })
   
   output$plot <- renderPlot({
+    plot <- well_plots()
+    show(plot)
+  })
+  
+  output$mappingplot <- renderPlot({
     plot <- well_plots()
     show(plot)
   })
@@ -917,7 +1007,7 @@ shinyServer(function(input, output){
   })
   
   output$ui.settings5 <- renderUI({
-    plate_layout <- get_layout()
+    plate_layout <- get_layout()$plate_layout
     if ((is.null(plate_layout))||(input$assay_type == 2))
       return(NULL)
     checkboxInput("mean_overlay", label = "plot respective means", value = FALSE)
