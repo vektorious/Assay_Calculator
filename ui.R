@@ -14,11 +14,13 @@ dashboardPage(skin = "green",
       menuItem("Instructions", tabName = "instructions", icon = icon("commenting-o"), selected = FALSE),
       menuItem("Data Analysis", tabName = "rawdata", icon = icon("calculator"), selected = TRUE),
       menuItemOutput("menu1"),
-      menuItemOutput("menu2"),      
-      menuItem("Mapping", tabName = "mapping", icon = icon("map-o"), selected = FALSE)
+      menuItem("Mapping Tools", tabName = "mapping", icon = icon("map-o"), selected = FALSE,
+               menuSubItem("Combine Files", tabName = "combine", icon = icon("cogs")),
+               menuSubItem("Wellcurves", tabName = "mapping_wellcurves", icon = icon("calculator"))),
+      menuItemOutput("menu2")
 
     ),
-    fileInput("data_file", label = h4("Data file input"), accept = c(".xls", ".xlsx")),
+    fileInput("data_file", label = h4("Data file input"), accept = c(".xls", ".xlsx", ".csv")),
     fileInput("layout_file", label = h4("Layout file input (optional)"), accept = c(".xls", ".xlsx"))
   ),
   
@@ -103,7 +105,7 @@ dashboardPage(skin = "green",
 #              collapsible = TRUE,
               radioButtons(inputId="assay_type", label="Assay Type:", 
                           choices = list("Calcium Assay" = 1, "ROS Assay" = 2),
-                          selected = 1),   
+                          selected = 1),
               uiOutput("ui.settings1"),
               hr(),
               h4("Options"),
@@ -133,10 +135,10 @@ dashboardPage(skin = "green",
               solidHeader = TRUE,
               status = "success",
               radioButtons(inputId="bar_rotation", label=h4("Bar Rotation"), 
-                           choices = list("vertical bars" = 1, "horizontal bars" = 2),
+                           choices = list("Vertical Bars" = 1, "Horizontal Bars" = 2),
                            selected = 1),
               radioButtons(inputId="bar_columns", label=h4("Plot Arrangement"), 
-                           choices = list("vertical alignment" = 1, "horizontal alignment" = 2),
+                           choices = list("Vertical Alignment" = 1, "Horizontal Alignment" = 2),
                            selected = 1)
             )
           )
@@ -155,55 +157,35 @@ dashboardPage(skin = "green",
                 solidHeader = TRUE,
                 status = "success",
                 checkboxGroupInput("settings_mean", label = h5("General Setting"), 
-                                   choices = list("Show SD (takes time!)" = 1))
+                                   choices = list("Show SD (takes time!)" = 1)),
+                radioButtons(inputId="graph_sorting", label=h4("Sort graphs by"), 
+                             choices = list("Elcicitor" = 1, "Genotype" = 2),
+                             selected = 1)
                 )
           )
         ),
 
-      tabItem(tabName = "mapping",
+
+      tabItem(tabName = "combine",
           fluidRow(  
-            box(title = "Mapping Data",
+            box(title = "Combine raw files",
                 solidHeader = TRUE,
                 status = "success",
                 width = 12,
                 collapsible = TRUE,
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q1_file", label = h4("Quadrant 1 data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q2_file", label = h4("Quadrant 2 data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q3_file", label = h4("Quadrant 3 data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q4_file", label = h4("Quadrant 4 data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q1E_file", label = h4("Quadrant 1 measurement data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q2E_file", label = h4("Quadrant 2 measurement data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q3E_file", label = h4("Quadrant 3 measurement data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q4E_file", label = h4("Quadrant 4 measurement data input"), accept = c(".txt"))),
                 br(),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q1_file", label = h4("Quadrant 1 discharge data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q2_file", label = h4("Quadrant 2 discharge data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q3_file", label = h4("Quadrant 3 discharge data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q4_file", label = h4("Quadrant 4 discharge ata input"), accept = c(".txt"))),
-                hr(),
-                h4("Options"),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N1_file", label = h4("Quadrant WT 1 data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N2_file", label = h4("Quadrant WT 2 data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N3_file", label = h4("Quadrant WT 3 data input"), accept = c(".txt"))),
-                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("N4_file", label = h4("Quadrant WT 4 data input"), accept = c(".txt"))),                
-                uiOutput("ui.settings1"),
-                hr(),
-                h4("Options"),
-                checkboxInput("file_name", label = "Write filename as header", value = TRUE),
-                uiOutput("ui.settings5"),
-                uiOutput("ui.settings2"),
-                uiOutput("ui.settings3"),
-                uiOutput("ui.settings4")
-          )
-        ),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q1D_file", label = h4("Quadrant 1 discharge data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q2D_file", label = h4("Quadrant 2 discharge data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q3D_file", label = h4("Quadrant 3 discharge data input"), accept = c(".txt"))),
+                div(style="display: inline-block;vertical-align:top; width: 300px;",fileInput("Q4D_file", label = h4("Quadrant 4 discharge data input"), accept = c(".txt"))),
+                br(),
+                downloadButton('downloadCombined', 'Download File')
 
-          fluidRow(
-            box(title = "Well Curves",
-                solidHeader = TRUE,
-                status = "success",
-                #              background = "black",
-                width = 12,
-                collapsible = FALSE,
-                plotOutput("plot", height = 600))),        
-        
-        fluidRow(
-          uiOutput("ui.plate_layout")
+          )
         )
 ),
 

@@ -18,10 +18,65 @@ norm.well <- function(x){
   return(xn)
 }
 
+#converting raw .txt files of Luminoscan to complete dataframes
+
+curateQ <- function(QE = NULL, QD = NULL){
+  if(is.null(QE)) return(0)
+  if(is.null(QD)) return(0)
+  
+  QE <- read.table(QE, sep = "\t", dec = ",", header = FALSE, na.strings = "", as.is = TRUE)
+  QE <- QE[,!apply(QE, 2, function(x){all(is.na(x))})] 
+  QE <- QE[!apply(QE, 1, function(x){all(is.na(x))}),]
+  QE <- QE[,2:(ncol(QE))]
+  
+  QE_curated <- NULL
+  index = 1
+  for(i in seq(nrow(QE)/73)){
+    if(is.null(QE_curated)) {
+      QE_curated <- QE[index:(index+72),1:ncol(QE)]
+    } else {
+      QE_curated <- cbind(QE_curated, QE[index:(index+72),1:ncol(QE)])
+    }
+    index = index + 73
+  }
+  
+  QE_curated[1,] <- gsub("M.", "", QE_curated[1,])
+  colnames(QE_curated) <- QE_curated[1,]
+  QE_curated <- QE_curated[2:nrow(QE_curated),]
+  QE_curated <- apply(QE_curated, 2, type.convert, dec = ",")
+  
+  QD <- read.table(QD, sep = "\t", dec = ",", header = FALSE, na.strings = "", as.is = TRUE)
+  QD <- QD[,!apply(QD, 2, function(x){all(is.na(x))})]
+  QD <- QD[!apply(QD, 1, function(x){all(is.na(x))}),]
+  QD <- QD[,2:(ncol(QD))]
+  
+  QD_curated <- NULL
+  index = 1
+  for(i in seq(nrow(QD)/7)){
+    if(is.null(QD_curated)) {
+      QD_curated <- QD[index:(index+6),1:ncol(QD)]
+    } else {
+      QD_curated <- cbind(QD_curated, QD[index:(index+6),1:ncol(QD)])
+    }
+    index = index + 7
+  }
+  
+  QD_curated[1,] <- gsub("M.", "", QD_curated[1,])
+  colnames(QD_curated) <- QD_curated[1,]
+  QD_curated <- QD_curated[2:nrow(QD_curated),]
+  QD_curated <- apply(QD_curated, 2, type.convert, dec = ",")
+  
+  Q_curated <- rbind(QE_curated, QD_curated)
+  Q_curated_df <- data.frame(Q_curated, row.names = NULL)
+  Q_curated_df[is.na(Q_curated_df)] = 0
+  
+  return(Q_curated_df)
+}
+
 ####################################################
 
-shinyServer(function(input, output) {
-
+shinyServer(function(input, output){
+  
   calculate <- reactive({
 
     if (input$assay_type == 2){
@@ -32,8 +87,11 @@ shinyServer(function(input, output) {
     
     inputfile <- input$data_file
     if (is.null(inputfile)) return(NULL)
-    
-    rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
+    if((tools::file_ext(inputfile[1]) == "xlsx")||(tools::file_ext(inputfile[1]) == "xls")){
+      rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
+    } else if (tools::file_ext(inputfile[1]) == "csv"){
+      rawdata <- read.csv(inputfile$datapath)
+    }
     colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
     rawdata[is.na(rawdata)]=0
   
@@ -58,13 +116,21 @@ shinyServer(function(input, output) {
       chosen_set <- ms_nd_melted
     }
     
+    if (ncol(rawdata) > 96){
+      well_plate <- 384
+    } else {
+      well_plate <- 96
+    }
+    print(well_plate)
+    
     calc_output <- list("ms_rawdata" = ms_rawdata, 
                         "ms_normdata" = ms_normdata, 
                         "ms_rd_melted" = ms_rd_melted, 
                         "ms_nd_melted" = ms_nd_melted,
                         "chosen_set" = chosen_set,
                         "yrange" = c(min(chosen_set$value), max(chosen_set$value)),
-                        "xrange" = c(min(chosen_set$time), max(chosen_set$time)))
+                        "xrange" = c(min(chosen_set$time), max(chosen_set$time)),
+                        "well_plate" = well_plate)
     
     return(calc_output)
     
@@ -89,20 +155,32 @@ shinyServer(function(input, output) {
   plate_layout <- reactive({
     
     plate_layout <- get_layout()
+    well_plate <- calculate()$well_plate
     
     if (is.null(plate_layout))
       return(NULL)
     
     glayout <- ggplot(data=plate_layout, aes(x=Column, y=Row)) +
-      geom_point(size=9) +
-      geom_point(size=7, aes(colour = elicitor)) +
-      geom_point(size=9, aes(alpha = genotype)) +
       scale_alpha_discrete(range = c(0.4, 0.05)) +
-      labs(title="Plate Layout")
-    glayout <- glayout +
-      coord_fixed(ratio=(13/12)/(9/8), xlim=c(0.8, 12.2), ylim=c(0.6, 8.4)) +
-      scale_y_reverse(breaks=seq(1, 8), labels=LETTERS[1:8]) +
-      scale_x_continuous(breaks=seq(1, 12))
+      labs(title= paste("Plate Layout:", input$layoutfile))
+    
+    if(well_plate == 96){
+      glayout <- glayout +
+        geom_point(size=9) +
+        geom_point(size=7, aes(colour = elicitor)) +
+        geom_point(size=9, aes(alpha = genotype)) +
+        coord_fixed(ratio=(13/12)/(9/8), xlim=c(0.8, 12.2), ylim=c(0.6, 8.4)) +
+        scale_y_reverse(breaks=seq(1, 8), labels=LETTERS[1:8]) +
+        scale_x_continuous(breaks=seq(1, 12))
+    } else if (well_plate == 384){
+      glayout <- glayout +
+        geom_point(size=6) +
+        geom_point(size=4, aes(colour = elicitor)) +
+        geom_point(size=6, aes(alpha = genotype)) +
+        coord_fixed(ratio=(25/24)/(17/16), xlim=c(0.8, 24.2), ylim=c(0.6, 16.4)) +
+        scale_y_reverse(breaks=seq(1, 16), labels=LETTERS[1:16]) +
+        scale_x_continuous(breaks=seq(1, 24))
+    }
     glayout <- glayout + theme_bw() + guides(colour = guide_legend(title = "Elicitors", ncol = 2, byrow = TRUE), alpha = guide_legend(title = "Genotypes", ncol = 2, byrow = TRUE)) +
       theme(
         panel.grid.minor = element_blank(),
@@ -412,7 +490,14 @@ shinyServer(function(input, output) {
     
     chosen_set <- data$chosen_set
     
-    g <- ggplot(chosen_set, aes(time, value)) + facet_wrap(~well, ncol = 12)
+    g <- ggplot(chosen_set, aes(time, value)) 
+    
+    if(data$well_plate == 384){
+      g <- g + facet_wrap(~well, ncol = 24)
+    } else {
+      g <- g + facet_wrap(~well, ncol = 12)
+    }
+    
     
     if((is.null(input$mean_overlay) == FALSE) && (input$mean_overlay)){
       mean_melted <- mean_max_calculate()$mean_melted
@@ -551,8 +636,15 @@ shinyServer(function(input, output) {
       
     }
     
-    lpmax2 <- ggplot(max_lineplot, aes(color = genotype,x=time, y=values)) + geom_line() + facet_wrap(~elicitor) + 
-      scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4", "moccasin", "blue2", "maroon4", "turquoise4", "purple3", "pink3"))
+    lpmax2 <- ggplot(max_lineplot, aes(color = genotype,x=time, y=values)) + geom_line() + 
+      scale_color_manual(values=c("navy", "red3", "deeppink1", "greenyellow", "gray20", "green4", "moccasin", "blue2", "maroon4", "turquoise4", "purple3", "pink3", "lemonchiffon2", "gray70", "tomato2", "limegreen", "salmon1", "hotpink"))
+    
+    if(input$graph_sorting == 2){
+      lpmax2 <- lpmax2 + facet_wrap(~genotype)
+    } else {
+      lpmax2 <- lpmax2 + facet_wrap(~elicitor)
+    }
+    
     if(1 %in% input$settings_mean){
       lpmax2 <- lpmax2 + ggtitle(header) +
         geom_line(aes(x=time,y=values-sd), alpha=0.2) + 
@@ -697,6 +789,27 @@ shinyServer(function(input, output) {
       if (is.null(bar_plots) == FALSE){invisible(print(bar_plots))}
       if (is.null(graph_mean) == FALSE){invisible(print(graph_mean))}
       dev.off()
+      
+    }
+  )
+  
+
+  output$downloadCombined <- downloadHandler(
+    filename <- function(){
+      paste("combined_quadrants", "csv", sep = ".")
+    },
+    content = function(file) {
+      
+      Q1 <- curateQ(input$Q1E_file$datapath, input$Q1D_file$datapath)
+      Q2 <- curateQ(input$Q2E_file$datapath, input$Q2D_file$datapath)
+      Q3 <- curateQ(input$Q3E_file$datapath, input$Q3D_file$datapath)
+      Q4 <- curateQ(input$Q4E_file$datapath, input$Q4D_file$datapath)
+      
+      measurement <- Q1 + Q2 + Q3 + Q4
+      
+      write.csv(measurement, file = file, row.names = FALSE)
+      
+      
       
     }
   )
