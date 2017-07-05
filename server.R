@@ -152,6 +152,7 @@ shinyServer(function(input, output){
     
     ms_rawdata <- rawdata[1:(nrow(rawdata)-dc),] # isolates MS values of raw data
     ms_normdata <- normdata[1:(nrow(normdata)-dc),] # isolates MS values of normalized data
+    ms_normdata[is.nan(colSums(ms_normdata))] <- 0 #first replace all colSums resulting in NaNs with zeros
     
     ms_rawdata$time <- seq(0, (nrow(ms_rawdata)-1)*10, 10) # adds time values in seconds
     ms_normdata$time <- seq(0, (nrow(ms_normdata)-1)*10, 10) # adds time values in seconds
@@ -161,11 +162,12 @@ shinyServer(function(input, output){
     
     ms_normdata_copy <- ms_normdata
     
-    ms_normdata_copy[colSums(ms_normdata_copy)==0] <- NA
+    #ms_normdata_copy[is.nan(colSums(ms_normdata_copy))] <- 0 #first replace all colSums resulting in NaNs with zeros
+    ms_normdata_copy[colSums(ms_normdata_copy)==0] <- NA #then set every 0 column to NA 
     
     plate_mean <- matrix(ncol = 2, nrow = nrow(ms_normdata_copy))
     plate_mean[,1] <- ms_normdata_copy$time
-    plate_mean[,2] <- rowMeans(ms_normdata_copy[!ms_normdata_copy$time])
+    plate_mean[,2] <- rowMeans(ms_normdata_copy[!ms_normdata_copy$time], na.rm=TRUE)
     plate_mean <- data.frame(plate_mean)
     colnames(plate_mean) <- c("time", "values")
     
@@ -283,6 +285,7 @@ shinyServer(function(input, output){
       return(NULL)
     
     ms_normdata <- data$ms_normdata
+    ms_normdata[colSums(ms_normdata)==0] <- NA #fill empty columns with NA so they dont count into the mean
     
     all_means <- matrix(nrow = length(elicitors)*length(genotypes), ncol = 4, dimnames = NULL)
     all_means_graph <- matrix(nrow = length(elicitors)*length(genotypes)*length(ms_normdata[,1]), ncol = 5, dimnames = NULL)
@@ -305,9 +308,9 @@ shinyServer(function(input, output){
         wells <- raw_plate_layout$well[raw_plate_layout$elicitor == eli & raw_plate_layout$genotype == gen]
         current_set <- ms_normdata[colnames(ms_normdata) %in% wells]
         
-        current_rowmeans <- rowMeans(current_set)
-        current_rowsds <- apply(current_set, 1, sd)
-        current_max <- max(current_rowmeans[16:length(current_rowmeans)])
+        current_rowmeans <- rowMeans(current_set, na.rm = TRUE)
+        current_rowsds <- apply(current_set, 1, sd, na.rm = TRUE)
+        current_max <- max(current_rowmeans[16:length(current_rowmeans)], na.rm = TRUE)
         current_sd <- current_rowsds[current_rowmeans==current_max]
         #print(length(c(eli, gen, current_max, current_sd)))
         #print(c(paste(gen, eli, sep = " "), current_max, current_sd))
