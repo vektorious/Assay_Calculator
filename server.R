@@ -230,7 +230,7 @@ shinyServer(function(input, output){
       return(NULL)
     
     glayout <- ggplot(data=plate_layout, aes(x=Column, y=Row)) +
-      scale_alpha_discrete(range = c(0.4, 0.05)) +
+      scale_alpha_discrete(range = c(0.1, 0.005)) +
       labs(title= paste("Plate Layout:", input$layoutfile))
     
     if(well_plate == 96){
@@ -244,8 +244,8 @@ shinyServer(function(input, output){
     } else if (well_plate == 384){
       glayout <- glayout +
         geom_point(size=6) +
-        geom_point(size=4, aes(colour = elicitor)) +
-        geom_point(size=6, aes(alpha = genotype)) +
+        geom_point(size=4, aes(colour = genotype)) +
+        geom_point(size=6, aes(alpha = elicitor)) +
         coord_fixed(ratio=(25/24)/(17/16), xlim=c(0.8, 24.2), ylim=c(0.6, 16.4)) +
         scale_y_reverse(breaks=seq(1, 16), labels=LETTERS[1:16]) +
         scale_x_continuous(breaks=seq(1, 24))

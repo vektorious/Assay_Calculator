@@ -3,8 +3,8 @@ title: Assay_Calculator
 account: openplantscience
 server: shinyapps.io
 appId: 180631
-bundleId: 893411
+bundleId: 894127
 url: https://openplantscience.shinyapps.io/assay_calculator/
-when: 1499295375.97311
+when: 1499352211.57619
 asMultiple: FALSE
 asStatic: FALSE
