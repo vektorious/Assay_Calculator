@@ -6,6 +6,8 @@ library(plyr)
 library(reshape2)
 library(grid)
 library(shinydashboard)
+library(gridExtra)
+options(java.parameters = "-Xss2560k")
 
 ##################### functions #####################
 
@@ -83,6 +85,195 @@ curateQ <- function(QE = NULL, QD = NULL){
   return(Q_curated_df)
 }
 
+#get the plate layout out of the raw plate layout file
+
+layout <- function(inputlayout){
+
+  if (is.null(inputlayout))
+    return(NULL)
+
+  raw_plate_layout <- readWorksheetFromFile(inputlayout$datapath, sheet=1)
+
+  plate_layout <- mutate(raw_plate_layout,
+                        Row=as.numeric(match(toupper(substr(well, 1, 1)), LETTERS)),
+                        Column=as.numeric(substr(well, 2, 5)))
+
+  empty_wells <- raw_plate_layout$well[is.na(raw_plate_layout$elicitor) & is.na(raw_plate_layout$genotype)]
+
+  output <- list("empty_wells" = empty_wells,
+                "plate_layout" = plate_layout)
+  return(output)
+}
+
+# calculate one dataset
+
+calculate_data <- function(inputfile, dc, data_type, assay_type){
+
+    if((tools::file_ext(inputfile[1]) == "xlsx")||(tools::file_ext(inputfile[1]) == "xls")){
+    rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
+  } else if (tools::file_ext(inputfile[1]) == "csv"){
+    rawdata <- read.csv(inputfile$datapath)
+  }
+  #colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
+  newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
+  colnames(rawdata) <- newcolnames[!newcolnames=="M"]
+  rawdata[is.na(rawdata)]=0
+
+
+  #normdata <- apply(rawdata, 2, norm.well) #w/o dependencies 
+  normdata <- colwise(norm.well)(rawdata) # colwise needs library(plyr)
+
+  ms_rawdata <- rawdata[1:(nrow(rawdata)-dc),] # isolates MS values of raw data
+  ms_normdata <- normdata[1:(nrow(normdata)-dc),] # isolates MS values of normalized data
+  ms_normdata[is.nan(colSums(ms_normdata))] <- 0 #first replace all colSums resulting in NaNs with zeros
+
+  ms_rawdata$time <- seq(0, (nrow(ms_rawdata)-1)*10, 10) # adds time values in seconds
+  ms_normdata$time <- seq(0, (nrow(ms_normdata)-1)*10, 10) # adds time values in seconds
+
+  ms_rd_melted <- melt(ms_rawdata, id.vars = "time", variable.name = "well") # formatting for ggplot
+  ms_nd_melted <- melt(ms_normdata, id.vars = "time", variable.name = "well") # formatting for ggplot
+
+  ms_normdata_copy <- ms_normdata
+
+  #ms_normdata_copy[is.nan(colSums(ms_normdata_copy))] <- 0 #first replace all colSums resulting in NaNs with zeros
+  ms_normdata_copy[colSums(ms_normdata_copy)==0] <- NA #then set every 0 column to NA 
+
+  plate_mean <- matrix(ncol = 2, nrow = nrow(ms_normdata_copy))
+  plate_mean[,1] <- ms_normdata_copy$time
+  plate_mean[,2] <- rowMeans(ms_normdata_copy[!ms_normdata_copy$time], na.rm=TRUE)
+  plate_mean <- data.frame(plate_mean)
+  colnames(plate_mean) <- c("time", "values")
+
+  if (data_type == 1){
+    chosen_set <- ms_rd_melted
+  } else if (assay_type == 2){
+    chosen_set <- ms_rd_melted
+  }else {
+    chosen_set <- ms_nd_melted
+  }
+
+  if (ncol(rawdata) > 96){
+    well_plate <- 384
+  } else {
+    well_plate <- 96
+  }
+
+  calc_output <- list("ms_rawdata" = ms_rawdata, 
+                      "ms_normdata" = ms_normdata, 
+                      "ms_rd_melted" = ms_rd_melted, 
+                      "ms_nd_melted" = ms_nd_melted,
+                      "chosen_set" = chosen_set,
+                      "yrange" = c(min(chosen_set$value), max(chosen_set$value)),
+                      "xrange" = c(min(chosen_set$time), max(chosen_set$time)),
+                      "well_plate" = well_plate,
+                      "plate_mean" = plate_mean)
+  
+  return(calc_output)
+}
+# draw plate layout
+
+draw_layout <- function(plate_layout, well_plate, layoutfile){
+
+  glayout <- ggplot(data=plate_layout, aes(x=Column, y=Row)) +
+    scale_alpha_discrete(range = c(0.1, 0.005)) +
+    labs(title= paste("Plate Layout:", layoutfile))
+
+  if(well_plate == 96){
+    glayout <- glayout +
+      geom_point(size=9) +
+      geom_point(size=7, aes(colour = elicitor)) +
+      geom_point(size=9, aes(alpha = genotype)) +
+      coord_fixed(ratio=(13/12)/(9/8), xlim=c(0.8, 12.2), ylim=c(0.6, 8.4)) +
+      scale_y_reverse(breaks=seq(1, 8), labels=LETTERS[1:8]) +
+      scale_x_continuous(breaks=seq(1, 12))
+  } else if (well_plate == 384){
+    glayout <- glayout +
+      geom_point(size=6) +
+      geom_point(size=4, aes(colour = genotype)) +
+      geom_point(size=6, aes(alpha = elicitor)) +
+      coord_fixed(ratio=(25/24)/(17/16), xlim=c(0.8, 24.2), ylim=c(0.6, 16.4)) +
+      scale_y_reverse(breaks=seq(1, 16), labels=LETTERS[1:16]) +
+      scale_x_continuous(breaks=seq(1, 24))
+  }
+  glayout <- glayout + theme_bw() + guides(colour = guide_legend(title = "Elicitors", ncol = 2, byrow = TRUE), alpha = guide_legend(title = "Genotypes", ncol = 2, byrow = TRUE)) +
+    theme(
+      panel.grid.minor = element_blank(),
+      panel.grid.major = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      strip.background = element_blank(),
+      panel.background = element_blank(),
+      panel.border = element_rect(colour = "black"),
+      legend.key=element_blank()
+    )
+  return(glayout)
+}
+
+
+# draw well plate
+
+draw_well_plate <- function(data, empty_wells, mean_overlay, mean_overlay_plate, mean_overlay_WT, file_name, data_file, xlim, ylim){
+  chosen_set <- data$chosen_set
+  
+  if(is.null(empty_wells) == FALSE){
+    chosen_set$value[chosen_set$well %in% empty_wells] <- 0
+  }
+
+  g <- ggplot(chosen_set, aes(time, value)) 
+
+  if(data$well_plate == 384){
+    g <- g + facet_wrap(~well, ncol = 24)
+  } else {
+    g <- g + facet_wrap(~well, ncol = 12)
+  }
+
+
+  if((is.null(mean_overlay) == FALSE) && (mean_overlay)){
+    mean_melted <- mean_max_calculate()$mean_melted
+    g <- g + geom_line(data=mean_melted, aes(time, value), color = "red")
+  }
+
+
+  if((is.null(mean_overlay_plate) == FALSE) && (mean_overlay_plate)){
+    g <- g + geom_line(data=data$plate_mean, aes(time, values), color = "limegreen")
+  }
+
+  if((is.null(mean_overlay_WT) == FALSE) && (mean_overlay_WT)){
+    WTplate_mean <- calculate_plate_mean()
+    g <- g + geom_line(data=WTplate_mean, aes(time, values), color = "blue")
+  }
+
+  if(file_name){g <- g + labs(title = paste("rawdata file:", data_file))}
+  
+  g <- g + geom_line() + theme_bw() + theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.text.x = element_blank(),
+    strip.text.x = element_blank(),
+    strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(colour = "black")
+  )
+
+  #g <- g + geom_line(data = data$ms_normdata, aes(time, A1), color = "red")
+
+  g <- g + annotate("text",
+                    x = (xlim[2]*0.85),
+                    y = (ylim*0.9),
+                   label = colnames(data$ms_normdata)[1:(length(data$ms_normdata)-1)],
+                   size = 2.5)
+
+  g <- g + ylim(0, ylim) + xlim(xlim[1], xlim[2])
+
+
+
+  #if (data$yaxis_max != input$ylim){
+  #  g <- g + ylim(0, input$ylim)
+  #}
+}
 ####################################################
 
 shinyServer(function(input, output){
@@ -136,90 +327,53 @@ shinyServer(function(input, output){
     
     inputfile <- input$data_file
     if (is.null(inputfile)) return(NULL)
-    if((tools::file_ext(inputfile[1]) == "xlsx")||(tools::file_ext(inputfile[1]) == "xls")){
-      rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
-    } else if (tools::file_ext(inputfile[1]) == "csv"){
-      rawdata <- read.csv(inputfile$datapath)
-    }
-    #colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
-    newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
-    colnames(rawdata) <- newcolnames[!newcolnames=="M"]
-    rawdata[is.na(rawdata)]=0
-  
     
-    #normdata <- apply(rawdata, 2, norm.well) #w/o dependencies 
-    normdata <- colwise(norm.well)(rawdata) # colwise needs library(plyr)
-    
-    ms_rawdata <- rawdata[1:(nrow(rawdata)-dc),] # isolates MS values of raw data
-    ms_normdata <- normdata[1:(nrow(normdata)-dc),] # isolates MS values of normalized data
-    ms_normdata[is.nan(colSums(ms_normdata))] <- 0 #first replace all colSums resulting in NaNs with zeros
-    
-    ms_rawdata$time <- seq(0, (nrow(ms_rawdata)-1)*10, 10) # adds time values in seconds
-    ms_normdata$time <- seq(0, (nrow(ms_normdata)-1)*10, 10) # adds time values in seconds
-    
-    ms_rd_melted <- melt(ms_rawdata, id.vars = "time", variable.name = "well") # formatting for ggplot
-    ms_nd_melted <- melt(ms_normdata, id.vars = "time", variable.name = "well") # formatting for ggplot
-    
-    ms_normdata_copy <- ms_normdata
-    
-    #ms_normdata_copy[is.nan(colSums(ms_normdata_copy))] <- 0 #first replace all colSums resulting in NaNs with zeros
-    ms_normdata_copy[colSums(ms_normdata_copy)==0] <- NA #then set every 0 column to NA 
-    
-    plate_mean <- matrix(ncol = 2, nrow = nrow(ms_normdata_copy))
-    plate_mean[,1] <- ms_normdata_copy$time
-    plate_mean[,2] <- rowMeans(ms_normdata_copy[!ms_normdata_copy$time], na.rm=TRUE)
-    plate_mean <- data.frame(plate_mean)
-    colnames(plate_mean) <- c("time", "values")
-    
-    if (input$data_type == 1){
-      chosen_set <- ms_rd_melted
-    } else if (input$assay_type == 2){
-      chosen_set <- ms_rd_melted
-    }else {
-      chosen_set <- ms_nd_melted
-    }
-    
-    if (ncol(rawdata) > 96){
-      well_plate <- 384
-    } else {
-      well_plate <- 96
-    }
-    print(well_plate)
-    
-    calc_output <- list("ms_rawdata" = ms_rawdata, 
-                        "ms_normdata" = ms_normdata, 
-                        "ms_rd_melted" = ms_rd_melted, 
-                        "ms_nd_melted" = ms_nd_melted,
-                        "chosen_set" = chosen_set,
-                        "yrange" = c(min(chosen_set$value), max(chosen_set$value)),
-                        "xrange" = c(min(chosen_set$time), max(chosen_set$time)),
-                        "well_plate" = well_plate,
-                        "plate_mean" = plate_mean)
+    calc_output <- calculate_data(inputfile, dc, input$data_type, input$assay_type)
     
     return(calc_output)
     
   })
+  
+  multiple_calulate <- reactive({
+    if(is.null(input$data2)&is.null(input$data3)&is.null(input$data4)){
+      return(NULL)
+    }
+    
+    if (input$assay_type == 2){
+      dc <- 0
+    } else { 
+      dc <- input$dc
+    }
+    
+    output <- list()
+    data1 <- calculate()
+    output$data1 <- data1
+    
+    if(!is.null(input$data2)){
+      data2 <- calculate_data(input$data2, dc, input$data_type, input$assay_type)
+      output$data2 <- data2
+    }
+    if(!is.null(input$data3)){
+      data3 <- calculate_data(input$data3, dc, input$data_type, input$assay_type)
+      output$data3 <- data3
+    }
+    if(!is.null(input$data4)){
+      data4 <- calculate_data(input$data4, dc, input$data_type, input$assay_type)
+      output$data4 <- data4
+    }
+      
+    return(output)
+  })
+  
 
   get_layout <- reactive({
     inputlayout <- input$layout_file
     
-    if (is.null(inputlayout))
-      return(NULL)
-    
-    raw_plate_layout <- readWorksheetFromFile(inputlayout$datapath, sheet=1)
-    
-    plate_layout <- mutate(raw_plate_layout,
-                           Row=as.numeric(match(toupper(substr(well, 1, 1)), LETTERS)),
-                           Column=as.numeric(substr(well, 2, 5)))
-    
-    empty_wells <- raw_plate_layout$well[is.na(raw_plate_layout$elicitor) & is.na(raw_plate_layout$genotype)]
-    
-    output <- list("empty_wells" = empty_wells,
-                   "plate_layout" = plate_layout)
-    
+    output <- layout(inputlayout)
     return(output)
     
   })
+  
   
   plate_layout <- reactive({
     
@@ -228,39 +382,11 @@ shinyServer(function(input, output){
     
     if (is.null(plate_layout))
       return(NULL)
+    if (is.null(well_plate))
+      well_plate = 96
+    layoutfile <- input$layoutfile
+    glayout <- draw_layout(plate_layout, well_plate, layoutfile)
     
-    glayout <- ggplot(data=plate_layout, aes(x=Column, y=Row)) +
-      scale_alpha_discrete(range = c(0.1, 0.005)) +
-      labs(title= paste("Plate Layout:", input$layoutfile))
-    
-    if(well_plate == 96){
-      glayout <- glayout +
-        geom_point(size=9) +
-        geom_point(size=7, aes(colour = elicitor)) +
-        geom_point(size=9, aes(alpha = genotype)) +
-        coord_fixed(ratio=(13/12)/(9/8), xlim=c(0.8, 12.2), ylim=c(0.6, 8.4)) +
-        scale_y_reverse(breaks=seq(1, 8), labels=LETTERS[1:8]) +
-        scale_x_continuous(breaks=seq(1, 12))
-    } else if (well_plate == 384){
-      glayout <- glayout +
-        geom_point(size=6) +
-        geom_point(size=4, aes(colour = genotype)) +
-        geom_point(size=6, aes(alpha = elicitor)) +
-        coord_fixed(ratio=(25/24)/(17/16), xlim=c(0.8, 24.2), ylim=c(0.6, 16.4)) +
-        scale_y_reverse(breaks=seq(1, 16), labels=LETTERS[1:16]) +
-        scale_x_continuous(breaks=seq(1, 24))
-    }
-    glayout <- glayout + theme_bw() + guides(colour = guide_legend(title = "Elicitors", ncol = 2, byrow = TRUE), alpha = guide_legend(title = "Genotypes", ncol = 2, byrow = TRUE)) +
-      theme(
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-        axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        strip.background = element_blank(),
-        panel.background = element_blank(),
-        panel.border = element_rect(colour = "black"),
-        legend.key=element_blank()
-      )
     return(glayout)
     
   })
@@ -286,7 +412,9 @@ shinyServer(function(input, output){
     
     ms_normdata <- data$ms_normdata
     ms_normdata[colSums(ms_normdata)==0] <- NA #fill empty columns with NA so they dont count into the mean
-    
+    ms_normdata_names <- ms_normdata
+    colnames(ms_normdata_names) <- paste(plate_layout[plate_layout$well==colnames(ms_normdata_names),]$genotype, plate_layout[plate_layout$well==colnames(ms_normdata_names),]$elicitor)
+    print(colnames(ms_normdata_names))
     all_means <- matrix(nrow = length(elicitors)*length(genotypes), ncol = 4, dimnames = NULL)
     all_means_graph <- matrix(nrow = length(elicitors)*length(genotypes)*length(ms_normdata[,1]), ncol = 5, dimnames = NULL)
     
@@ -354,7 +482,8 @@ shinyServer(function(input, output){
                          "all_means_graph" = all_means_graph,
                          "graphs_shaped" = graphs_shaped,
                          "graphs_shaped_w_sd" = graphs_shaped_w_sd,
-                         "mean_melted" = mean_melted)
+                         "mean_melted" = mean_melted,
+                         "ms_normdata_names" = ms_normdata_names)
     
     return(total_output)
     
@@ -559,72 +688,15 @@ shinyServer(function(input, output){
     if ((is.null(data))||(is.null(input$ylim))||(is.null(input$xlim)))
       return(NULL)
     
-    chosen_set <- data$chosen_set
-    
     empty_wells <- get_layout()$empty_wells
     
-    if(is.null(empty_wells) == FALSE){
-      chosen_set$value[chosen_set$well %in% empty_wells] <- 0
-    }
-    
-    g <- ggplot(chosen_set, aes(time, value)) 
-    
-    if(data$well_plate == 384){
-      g <- g + facet_wrap(~well, ncol = 24)
-    } else {
-      g <- g + facet_wrap(~well, ncol = 12)
-    }
-    
-    
-    if((is.null(input$mean_overlay) == FALSE) && (input$mean_overlay)){
-      mean_melted <- mean_max_calculate()$mean_melted
-      g <- g + geom_line(data=mean_melted, aes(time, value), color = "red")
-    }
-    
-    
-    if((is.null(input$mean_overlay_plate) == FALSE) && (input$mean_overlay_plate)){
-      g <- g + geom_line(data=data$plate_mean, aes(time, values), color = "limegreen")
-    }
-    
-    if((is.null(input$mean_overlay_WT) == FALSE) && (input$mean_overlay_WT)){
-      WTplate_mean <- calculate_plate_mean()
-      g <- g + geom_line(data=WTplate_mean, aes(time, values), color = "blue")
-    }
-    
-    if(input$file_name){g <- g + labs(title = paste("rawdata file:", input$data_file))}
-    
-    g <- g + geom_line() + theme_bw() + theme(
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_blank(),
-      axis.title.x = element_blank(),
-      axis.title.y = element_blank(),
-      axis.ticks.x = element_blank(),
-      axis.text.x = element_blank(),
-      strip.text.x = element_blank(),
-      strip.background = element_blank(),
-      panel.background = element_blank(),
-      panel.border = element_rect(colour = "black")
-    )
-    
-    #g <- g + geom_line(data = data$ms_normdata, aes(time, A1), color = "red")
-   
-    g <- g + annotate("text",
-                      x = (input$xlim[2]*0.85),
-                      y = (input$ylim*0.9),
-                      label = colnames(data$ms_normdata)[1:(length(data$ms_normdata)-1)],
-                      size = 2.5)
-    
-      g <- g + ylim(0, input$ylim) + xlim(input$xlim[1], input$xlim[2])
-
-    
-    
-    #if (data$yaxis_max != input$ylim){
-    #  g <- g + ylim(0, input$ylim)
-    #}
+    g <- draw_well_plate(data, empty_wells, input$mean_overlay, input$mean_overlay_plate, 
+                         input$mean_overlay_WT, input$file_name, input$data_file, input$xlim, input$ylim)
 
     return(g)
 
   })
+
   
   
   bar_plots_max <- reactive({
@@ -757,6 +829,28 @@ shinyServer(function(input, output){
   output$plot <- renderPlot({
     plot <- well_plots()
     show(plot)
+
+  })
+  
+  output$multiple_wellplots <- renderPlot({
+    if ((is.null(data))||(is.null(input$ylim))||(is.null(input$xlim)))
+      return(NULL)
+    empty_wells <- get_layout()$empty_wells
+    complete_data <- multiple_calulate()
+    if (is.null(complete_data))
+      return(NULL)
+    plots <- list()
+    i=1
+    empty_wells <- get_layout()$empty_wells
+    for (dataset in complete_data){
+      g <- draw_well_plate(dataset, empty_wells, input$mean_overlay, input$mean_overlay_plate, 
+                           input$mean_overlay_WT, input$file_name, input$data_file, input$xlim, input$ylim)
+      plots[[i]] <- g
+      i = i+1
+    }
+    
+    do.call("grid.arrange", c(plots, ncol=2))
+    
   })
   
   output$mappingplot <- renderPlot({
@@ -806,9 +900,11 @@ shinyServer(function(input, output){
         createSheet(wb, name = "normalized data")
         writeWorksheet(wb, data$ms_normdata, sheet = "normalized data")}
       if((is.null(ROSdata)==FALSE)||(is.null(CaMean)==FALSE)){
+        createSheet(wb, name = "data with names")
         createSheet(wb, name = "mean data")
         createSheet(wb, name = "maxima")
         if(input$assay_type==1){
+          writeWorksheet(wb, CaMean$ms_normdata_names, sheet = "data with names")
           writeWorksheet(wb, CaMean$graphs_shaped, sheet = "mean data")
           writeWorksheet(wb, CaMean$all_means_shaped, sheet = "maxima")
           createSheet(wb, name = "mean data with sd")
@@ -1035,7 +1131,7 @@ shinyServer(function(input, output){
   })
     
   output$ui.plate_layout<-renderUI({
-    if (is.null(plate_layout()))
+    if (is.null(get_layout()))
       return(NULL)
     
     box(title = "Plate Layout",
