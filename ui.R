@@ -42,7 +42,7 @@ dashboardPage(skin = "green",
     '))),
     tabItems(
       tabItem(tabName = "instructions",
-          HTML("<center><h1><strong>Welcome to Assay Calculator</strong></h1><h6>Version 2.1 (21.05.2017)</h6></center>"),
+          HTML("<center><h1><strong>Welcome to Assay Calculator</strong></h1><h6>Version 2.1 (19.03.2018)</h6></center>"),
           br(),
           div(class="body", style="font-size:120%",
               HTML("<p>This web application is designed to help you to analyse your data.
