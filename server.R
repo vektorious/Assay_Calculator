@@ -646,7 +646,7 @@ shinyServer(function(input, output){
     
     class(normdata_melted$time) <- "numeric"
     
-    maxima <- apply(normdata[(bg_values+2):nrow(normdata),1:ncol(normdata)], 2, max)
+    maxima <- apply(normdata[(bg_values+4):nrow(normdata),1:ncol(normdata)], 2, max) # change here for maxima settings +2 = skip first vaulue
     maxima <- maxima[!grepl("control", names(maxima))] # removes control values
     maxima_sd <- sd[normdata %in% maxima]
     
