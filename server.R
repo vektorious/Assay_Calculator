@@ -886,7 +886,7 @@ shinyServer(function(input, output){
       ROSdata <- NULL
       CaMean <- NULL
       if(input$assay_type==1){CaMean <- mean_max_calculate()}
-      if(input$assay_type==2){CaMean <- ROSdata <- ROS_calculate()}
+      if(input$assay_type==2){ROSdata <- ROS_calculate()}
       wellplot <- well_plots()
       layout <- plate_layout()
       barplot <- bar_plots_max()
