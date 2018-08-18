@@ -7,6 +7,7 @@ library(reshape2)
 library(grid)
 library(shinydashboard)
 library(gridExtra)
+library(gtools)
 options(java.parameters = "-Xss2560k")
 
 ##################### functions #####################
@@ -118,7 +119,9 @@ calculate_data <- function(inputfile, dc, data_type, assay_type){
   newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
   colnames(rawdata) <- newcolnames[!newcolnames=="M"]
   rawdata[is.na(rawdata)]=0
-
+  
+  rawdata <- rawdata[ , mixedsort(names(rawdata))]
+  
 
   #normdata <- apply(rawdata, 2, norm.well) #w/o dependencies 
   normdata <- colwise(norm.well)(rawdata) # colwise needs library(plyr)
@@ -218,7 +221,7 @@ draw_well_plate <- function(data, empty_wells, mean_overlay, mean_overlay_plate,
   if(is.null(empty_wells) == FALSE){
     chosen_set$value[chosen_set$well %in% empty_wells] <- 0
   }
-
+  
   g <- ggplot(chosen_set, aes(time, value)) 
 
   if(data$well_plate == 384){
