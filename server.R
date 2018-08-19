@@ -1,4 +1,3 @@
-#test_app 180317
 library(shiny)
 library(ggplot2)
 library(XLConnect)
@@ -110,17 +109,18 @@ layout <- function(inputlayout){
 
 calculate_data <- function(inputfile, dc, data_type, assay_type){
 
-    if((tools::file_ext(inputfile[1]) == "xlsx")||(tools::file_ext(inputfile[1]) == "xls")){
+    if((tools::file_ext(inputfile[1]) == "xlsx")||(tools::file_ext(inputfile[1]) == "xls")){ #check the file format to call right function to read it
     rawdata <- readWorksheetFromFile(inputfile$datapath, sheet=1)
   } else if (tools::file_ext(inputfile[1]) == "csv"){
     rawdata <- read.csv(inputfile$datapath)
   }
+  
   #colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
   newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
   colnames(rawdata) <- newcolnames[!newcolnames=="M"]
   rawdata[is.na(rawdata)]=0
   
-  rawdata <- rawdata[ , mixedsort(names(rawdata))]
+  rawdata <- rawdata[ , mixedsort(names(rawdata))] #this sorts the rawdata for well names, requires gtools
   
 
   #normdata <- apply(rawdata, 2, norm.well) #w/o dependencies 
@@ -185,7 +185,7 @@ draw_layout <- function(plate_layout, well_plate, layoutfile){
     glayout <- glayout +
       geom_point(size=9) +
       geom_point(size=7, aes(colour = elicitor)) +
-      geom_point(size=9, aes(alpha = genotype)) +
+      geom_point(size=6, aes(shape = genotype)) +
       coord_fixed(ratio=(13/12)/(9/8), xlim=c(0.8, 12.2), ylim=c(0.6, 8.4)) +
       scale_y_reverse(breaks=seq(1, 8), labels=LETTERS[1:8]) +
       scale_x_continuous(breaks=seq(1, 12))
@@ -193,7 +193,7 @@ draw_layout <- function(plate_layout, well_plate, layoutfile){
     glayout <- glayout +
       geom_point(size=6) +
       geom_point(size=4, aes(colour = genotype)) +
-      geom_point(size=6, aes(alpha = elicitor)) +
+      geom_point(size=5, aes(shape = elicitor)) +
       coord_fixed(ratio=(25/24)/(17/16), xlim=c(0.8, 24.2), ylim=c(0.6, 16.4)) +
       scale_y_reverse(breaks=seq(1, 16), labels=LETTERS[1:16]) +
       scale_x_continuous(breaks=seq(1, 24))
