@@ -7,6 +7,7 @@ library(grid)
 library(shinydashboard)
 library(gridExtra)
 library(gtools)
+library(ggsci)
 options(java.parameters = "-Xss2560k")
 
 ##################### functions #####################
@@ -185,7 +186,7 @@ draw_layout <- function(plate_layout, well_plate, layoutfile){
     glayout <- glayout +
       geom_point(size=9) +
       geom_point(size=7, aes(colour = elicitor)) +
-      geom_point(size=6, aes(shape = genotype)) +
+      geom_point(size=5, aes(shape = genotype)) +
       coord_fixed(ratio=(13/12)/(9/8), xlim=c(0.8, 12.2), ylim=c(0.6, 8.4)) +
       scale_y_reverse(breaks=seq(1, 8), labels=LETTERS[1:8]) +
       scale_x_continuous(breaks=seq(1, 12))
@@ -198,7 +199,7 @@ draw_layout <- function(plate_layout, well_plate, layoutfile){
       scale_y_reverse(breaks=seq(1, 16), labels=LETTERS[1:16]) +
       scale_x_continuous(breaks=seq(1, 24))
   }
-  glayout <- glayout + theme_bw() + guides(colour = guide_legend(title = "Elicitors", ncol = 2, byrow = TRUE), alpha = guide_legend(title = "Genotypes", ncol = 2, byrow = TRUE)) +
+  glayout <- glayout + theme_bw() + guides(colour = guide_legend(title = "Elicitors", ncol = 2, byrow = TRUE), alpha = guide_legend(title = "Genotypes", ncol = 2, byrow = TRUE)) + #scale_color_npg() + 
     theme(
       panel.grid.minor = element_blank(),
       panel.grid.major = element_blank(),
@@ -248,7 +249,8 @@ draw_well_plate <- function(data, empty_wells, mean_overlay, mean_overlay_plate,
 
   if(file_name){g <- g + labs(title = paste("rawdata file:", data_file))}
   
-  g <- g + geom_line() + theme_bw() + theme(
+  g <- g + geom_line() + theme_bw() + #scale_color_npg() + 
+    theme(
     panel.grid.minor = element_blank(),
     panel.grid.major = element_blank(),
     axis.title.x = element_blank(),
@@ -738,9 +740,9 @@ shinyServer(function(input, output){
     }
     
     if (input$bar_columns == 2){
-      bpmax <- ggplot(max_barplot, aes(fill=elicitor, y=values, x=elicitor)) + facet_wrap(~genotype, ncol = 2) + ggtitle(header)
+      bpmax <- ggplot(max_barplot, aes(fill=elicitor, y=values, x=elicitor)) + facet_wrap(~genotype, ncol = 2) + ggtitle(header) + theme(legend.position = "none")
     } else {
-      bpmax <- ggplot(max_barplot, aes(fill=elicitor, y=values, x=elicitor)) + facet_wrap(~genotype, ncol = 1) + ggtitle(header)
+      bpmax <- ggplot(max_barplot, aes(fill=elicitor, y=values, x=elicitor)) + facet_wrap(~genotype, ncol = 1) + ggtitle(header) + theme(legend.position = "none")
       }
     
     if(input$bar_rotation == 2){bpmax <- bpmax + coord_flip() + theme(legend.position = "none")}
@@ -751,7 +753,8 @@ shinyServer(function(input, output){
                                    position=position_dodge(.9))
     
     
-    bpmax <- bpmax + labs(x="", y=ylabel) + theme(axis.text.x = element_text(angle = 90, size = 10, vjust = 0.5),
+    bpmax <- bpmax + labs(x="", y=ylabel) + #scale_fill_npg() + 
+      theme(axis.text.x = element_text(angle = 90, size = 10, vjust = 0.5),
                                                     legend.title=element_blank(),
                                                     panel.background = element_rect(fill = "white", colour = "grey90"),
                                                     panel.grid.major = element_line(color = "grey90"),
@@ -822,7 +825,7 @@ shinyServer(function(input, output){
         lpmax2 <- lpmax2 + ggtitle(header) +
           geom_line(aes(x=time,y=values-sd, color = genotype), alpha=0.2) + 
           geom_line(aes(x=time,y=values+sd, color = genotype), alpha=0.2) +
-          geom_errorbar(aes(ymin=values-sd, ymax=values+sd, color = elicitor), alpha=0.2,
+          geom_errorbar(aes(ymin=values-sd, ymax=values+sd, color = genotype), alpha=0.2,
                         width=0,                    # Width of the error bars
                         position=position_dodge(.9))
       } else{
@@ -831,7 +834,8 @@ shinyServer(function(input, output){
     }
     
     
-    lpmax2 <- lpmax2 + labs(x="", y=ylabel) + theme(legend.title=element_blank(),
+    lpmax2 <- lpmax2 + labs(x="", y=ylabel) + #scale_color_npg() +
+      theme(legend.title=element_blank(),
                                                       panel.background = element_rect(fill = "white", colour = "grey90"),
                                                       panel.grid.major = element_line(color = "grey90"),
                                                       strip.background = element_rect(fill = "grey90", colour = NA),
