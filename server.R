@@ -804,20 +804,32 @@ shinyServer(function(input, output){
     
     if(input$graph_sorting == 2){
       lpmax2 <- lpmax2 + geom_line(aes(color = elicitor)) + facet_wrap(~genotype)
+      
+      if(1 %in% input$settings_mean){
+        lpmax2 <- lpmax2 + ggtitle(header) +
+          geom_line(aes(x=time,y=values-sd, color = elicitor), alpha=0.2) + 
+          geom_line(aes(x=time,y=values+sd, color = elicitor), alpha=0.2) +
+          geom_errorbar(aes(ymin=values-sd, ymax=values+sd, color = elicitor), alpha=0.2,
+                        width=0,                    # Width of the error bars
+                        position=position_dodge(.9))
+      } else{
+        lpmax2 <- lpmax2 + ggtitle("Mean")
+      }
     } else {
       lpmax2 <- lpmax2 + geom_line(aes(color = genotype)) + facet_wrap(~elicitor)
+      
+      if(1 %in% input$settings_mean){
+        lpmax2 <- lpmax2 + ggtitle(header) +
+          geom_line(aes(x=time,y=values-sd, color = genotype), alpha=0.2) + 
+          geom_line(aes(x=time,y=values+sd, color = genotype), alpha=0.2) +
+          geom_errorbar(aes(ymin=values-sd, ymax=values+sd, color = elicitor), alpha=0.2,
+                        width=0,                    # Width of the error bars
+                        position=position_dodge(.9))
+      } else{
+        lpmax2 <- lpmax2 + ggtitle("Mean")
+      }
     }
     
-    if(1 %in% input$settings_mean){
-      lpmax2 <- lpmax2 + ggtitle(header) +
-        geom_line(aes(x=time,y=values-sd), alpha=0.2) + 
-        geom_line(aes(x=time,y=values+sd), alpha=0.2) +
-        geom_errorbar(aes(ymin=values-sd, ymax=values+sd), alpha=0.2,
-                    width=0,                    # Width of the error bars
-                    position=position_dodge(.9))
-    } else{
-      lpmax2 <- lpmax2 + ggtitle("Mean")
-    }
     
     lpmax2 <- lpmax2 + labs(x="", y=ylabel) + theme(legend.title=element_blank(),
                                                       panel.background = element_rect(fill = "white", colour = "grey90"),
