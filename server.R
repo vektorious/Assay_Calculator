@@ -419,7 +419,6 @@ shinyServer(function(input, output){
     ms_normdata[colSums(ms_normdata)==0] <- NA #fill empty columns with NA so they dont count into the mean
     ms_normdata_names <- ms_normdata
     colnames(ms_normdata_names) <- paste(plate_layout[plate_layout$well==colnames(ms_normdata_names),]$genotype, plate_layout[plate_layout$well==colnames(ms_normdata_names),]$elicitor)
-    print(colnames(ms_normdata_names))
     all_means <- matrix(nrow = length(elicitors)*length(genotypes), ncol = 4, dimnames = NULL)
     all_means_graph <- matrix(nrow = length(elicitors)*length(genotypes)*length(ms_normdata[,1]), ncol = 5, dimnames = NULL)
     
@@ -443,7 +442,7 @@ shinyServer(function(input, output){
         
         current_rowmeans <- rowMeans(current_set, na.rm = TRUE)
         current_rowsds <- apply(current_set, 1, sd, na.rm = TRUE)
-        current_max <- max(current_rowmeans[16:length(current_rowmeans)], na.rm = TRUE)
+        current_max <- max(current_rowmeans[(12+input$exclude4max):length(current_rowmeans)], na.rm = TRUE)
         current_sd <- current_rowsds[current_rowmeans==current_max]
         #print(length(c(eli, gen, current_max, current_sd)))
         #print(c(paste(gen, eli, sep = " "), current_max, current_sd))
@@ -651,9 +650,12 @@ shinyServer(function(input, output){
     
     class(normdata_melted$time) <- "numeric"
     
-    maxima <- apply(normdata[(bg_values+4):nrow(normdata),1:ncol(normdata)], 2, max) # change here for maxima settings +2 = skip first vaulue
+    maxima <- apply(normdata[(bg_values+input$exclude4max+1):nrow(normdata),1:ncol(normdata)], 2, max) # change here for maxima settings +2 = skip first vaulue
     maxima <- maxima[!grepl("control", names(maxima))] # removes control values
     maxima_sd <- sd[normdata %in% maxima]
+    
+    print(normdata[normdata %in% maxima])
+    
     
     maxima_melted <- melt(maxima, value.name = "values")
     maxima_melted$name <- rownames(maxima_melted)
@@ -662,7 +664,8 @@ shinyServer(function(input, output){
     
     maxima_melted$genotype <- apply(maxima_melted, 1, annotate_type, data_info = meandata$dataset_info, type = "genotype")
     maxima_melted$elicitor <- apply(maxima_melted, 1, annotate_type, data_info = meandata$dataset_info, type = "elicitor")
-    maxima_melted$sd <- maxima_sd_melted$sd
+    
+    maxima_melted$sd <- maxima_sd_melted$sd #Error here if a maximum value appears twice in the dataset 
     
     sd2 <- sd
     colnames(sd2) <- replicate(ncol(sd2), "SDOM")

@@ -142,7 +142,9 @@ dashboardPage(skin = "green",
                            selected = 1),
               radioButtons(inputId="bar_columns", label=h4("Plot Arrangement"), 
                            choices = list("Vertical Alignment" = 1, "Horizontal Alignment" = 2),
-                           selected = 1)
+                           selected = 1),
+              sliderInput("exclude4max", label = h4("Exclude first Values"), min = 0, 
+                          max = 20, value = 4)
             )
           )
         ),
