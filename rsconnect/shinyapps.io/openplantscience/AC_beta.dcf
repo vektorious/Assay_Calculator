@@ -1,0 +1,12 @@
+name: AC_beta
+title: AC_beta
+username:
+account: openplantscience
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 557706
+bundleId: 1687125
+url: https://openplantscience.shinyapps.io/AC_beta/
+when: 1541586588.76495
+asMultiple: FALSE
+asStatic: FALSE
