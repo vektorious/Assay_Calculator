@@ -8,6 +8,8 @@ library(shinydashboard)
 library(gridExtra)
 library(gtools)
 library(ggsci)
+library(grid)
+library(png)
 options(java.parameters = "-Xss2560k")
 
 ##################### functions #####################
@@ -116,6 +118,7 @@ calculate_data <- function(inputfile, dc, data_type, assay_type){
     rawdata <- read.csv(inputfile$datapath)
   }
   
+  
   #colnames(rawdata) <- gsub("M.", "", colnames(rawdata))
   newcolnames <- unlist(strsplit(colnames(rawdata), ".", fixed = TRUE))
   colnames(rawdata) <- newcolnames[!newcolnames=="M"]
@@ -126,7 +129,6 @@ calculate_data <- function(inputfile, dc, data_type, assay_type){
 
   #normdata <- apply(rawdata, 2, norm.well) #w/o dependencies 
   normdata <- colwise(norm.well)(rawdata) # colwise needs library(plyr)
-
   ms_rawdata <- rawdata[1:(nrow(rawdata)-dc),] # isolates MS values of raw data
   ms_normdata <- normdata[1:(nrow(normdata)-dc),] # isolates MS values of normalized data
   ms_normdata[is.nan(colSums(ms_normdata))] <- 0 #first replace all colSums resulting in NaNs with zeros
@@ -210,6 +212,11 @@ draw_layout <- function(plate_layout, well_plate, layoutfile){
       panel.border = element_rect(colour = "black"),
       legend.key=element_blank()
     )
+  
+  #img <- readPNG("cat4.png") 
+ # g <- rasterGrob(img, interpolate=TRUE) 
+  #glayout <- glayout + annotation_custom(g, xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf)
+  
   return(glayout)
 }
 
@@ -230,7 +237,7 @@ draw_well_plate <- function(data, empty_wells, mean_overlay, mean_overlay_plate,
   } else {
     g <- g + facet_wrap(~well, ncol = 12)
   }
-
+  
 
   if((is.null(mean_overlay) == FALSE) && (mean_overlay)){
     mean_melted <- mean_max_calculate()$mean_melted
@@ -262,22 +269,29 @@ draw_well_plate <- function(data, empty_wells, mean_overlay, mean_overlay_plate,
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black")
   )
-
+  
   #g <- g + geom_line(data = data$ms_normdata, aes(time, A1), color = "red")
+  
+  g <- g + geom_text(aes(label=well, x = (xlim[2]*0.85), y = (ylim*0.9)), size = 3)
+  
+  # I have no idea but this does not work anymore after update of ggplot2
+  #g <- g + annotate("text", 
+  #                 x = (xlim[2]*0.85),
+  #                 y = (ylim*0.9),
+  #                 label = colnames(data$ms_normdata)[1:(length(data$ms_normdata)-1)],
+  #                 size = 2.5)
 
-  g <- g + annotate("text",
-                    x = (xlim[2]*0.85),
-                    y = (ylim*0.9),
-                   label = colnames(data$ms_normdata)[1:(length(data$ms_normdata)-1)],
-                   size = 2.5)
 
   g <- g + ylim(0, ylim) + xlim(xlim[1], xlim[2])
-
-
+  
+  #img <- readPNG("catx3.png")
+  #gg <- rasterGrob(img, interpolate=TRUE) 
+  #g <- g + annotation_custom(gg, xmin=xlim[2]*0.2, xmax=Inf, ymin=-Inf, ymax=Inf)
 
   #if (data$yaxis_max != input$ylim){
   #  g <- g + ylim(0, input$ylim)
   #}
+  return(g)
 }
 ####################################################
 
@@ -764,6 +778,9 @@ shinyServer(function(input, output){
                                                     strip.background = element_rect(fill = "grey90", colour = NA),
                                                     panel.grid.minor = element_line(colour = "grey90", size = 0.25))
     
+   # img <- readPNG("cat2.png") 
+   # gg <- rasterGrob(img, interpolate=TRUE) 
+   # bpmax <- bpmax + annotation_custom(gg, xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf)
     return(bpmax)
     
   })
@@ -845,6 +862,9 @@ shinyServer(function(input, output){
                                                       panel.grid.minor = element_line(colour = "grey90", size = 0.25),
                                                       legend.key=element_rect(fill='white'),
                                                       strip.text.x = element_text(size=10))
+   # img <- readPNG("cat3.png") 
+    #gg <- rasterGrob(img, interpolate=TRUE) 
+   # lpmax2 <- lpmax2 + annotation_custom(gg, xmin=-Inf, xmax=Inf, ymin=-Inf, ymax=Inf)
     return(lpmax2)
   })
   
